@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f141b">
+<title>BCM Lights</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>BCM Lights</h1>
+  <div class="conn" id="conn"><span class="dot"></span><span id="connText">conectando…</span></div>
+  <div class="topinfo" id="topinfo"></div>
+</header>
+
+<main class="layout">
+  <!-- ============ painel lateral ============ -->
+  <aside class="side card">
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="controls" role="tab">Controles</button>
+      <button class="tab" data-tab="config" role="tab">Configuração</button>
+    </nav>
+
+    <section class="tabpane" id="tab-controls">
+      <div class="group">
+        <h3>Ignição <span class="badge" id="ignPhys" hidden>GPIO</span></h3>
+        <div class="seg" id="ignSeg">
+          <button data-v="0">OFF</button><button data-v="1">ACC</button><button data-v="2">ON</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <h3>Comando de luz</h3>
+        <div class="seg" id="swSeg">
+          <button data-v="OFF">OFF</button><button data-v="PARK">Lanterna</button>
+          <button data-v="LOW">Farol</button><button data-v="AUTO">AUTO</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <h3>Chave / alavanca</h3>
+        <div class="row2">
+          <button class="big" id="btnLock">Travar</button>
+          <button class="big" id="btnUnlock">Destravar</button>
+        </div>
+        <button class="wide" id="btnFlash">Lampejo do farol alto</button>
+      </div>
+
+      <div class="group">
+        <h3>Portas</h3>
+        <div class="doors" id="doors">
+          <button data-i="0">Motorista</button><button data-i="1">Passageiro</button>
+          <button data-i="2">Traseira esq.</button><button data-i="3">Traseira dir.</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <h3>Luminosidade externa <span class="val" id="luxVal"></span></h3>
+        <div class="seg small" id="luxSrcSeg">
+          <button data-v="web">Slider</button><button data-v="ldr">Sensor LDR</button>
+        </div>
+        <input type="range" id="lux" min="0" max="4" step="0.01" value="3">
+        <div class="row3" id="luxPresets">
+          <button data-lux="5">Noite</button><button data-lux="100">Crepúsculo</button><button data-lux="2000">Dia</button>
+        </div>
+        <p class="hint" id="ldrInfo"></p>
+      </div>
+
+      <div class="group">
+        <h3>Bateria <span class="val" id="battVal"></span></h3>
+        <input type="range" id="batt" min="10.5" max="14.5" step="0.1" value="12.6">
+      </div>
+
+      <div class="group">
+        <h3>Simulação</h3>
+        <div class="row-inline">
+          <label>Velocidade
+            <select id="speed"><option>1</option><option>2</option><option>5</option><option>10</option><option>20</option></select>
+          </label>
+          <label>Janela
+            <select id="window"><option value="30">30 s</option><option value="60">60 s</option>
+              <option value="120" selected>120 s</option><option value="300">300 s</option></select>
+          </label>
+        </div>
+        <div class="row2">
+          <button id="btnPause">Pausar</button>
+          <button id="btnReset">Reiniciar</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="tabpane" id="tab-config" hidden>
+      <div id="configForm"></div>
+      <div class="group">
+        <h3>Hardware</h3>
+        <label class="switch"><input type="checkbox" id="physInputs"><span>Ler entradas físicas (GPIO)</span></label>
+      </div>
+      <button class="wide danger" id="btnDefaults">Restaurar padrão</button>
+      <p class="hint">As alterações valem na hora e são gravadas na flash do ESP32.</p>
+    </section>
+  </aside>
+
+  <!-- ============ carro + estado + eventos ============ -->
+  <section class="card carcard">
+    <svg id="car" viewBox="0 0 320 340" role="img" aria-label="Carro visto de cima">
+      <rect id="sky" x="0" y="0" width="320" height="340"/>
+      <polygon id="beamL" points="113,66 133,66 168,0 78,0"/>
+      <polygon id="beamR" points="187,66 207,66 242,0 152,0"/>
+      <ellipse id="puddleL" cx="60" cy="140" rx="32" ry="24"/>
+      <ellipse id="puddleR" cx="260" cy="140" rx="32" ry="24"/>
+      <rect class="body" x="105" y="60" width="110" height="230" rx="28"/>
+      <rect id="cabin" x="117" y="115" width="86" height="130" rx="14"/>
+      <line class="pillar" x1="119" y1="180" x2="201" y2="180"/>
+      <rect class="body" x="93" y="120" width="12" height="12" rx="2"/>
+      <rect class="body" x="215" y="120" width="12" height="12" rx="2"/>
+      <line class="door" id="door0" x1="105" y1="122" x2="105" y2="178"/>
+      <line class="door" id="door1" x1="215" y1="122" x2="215" y2="178"/>
+      <line class="door" id="door2" x1="105" y1="182" x2="105" y2="238"/>
+      <line class="door" id="door3" x1="215" y1="182" x2="215" y2="238"/>
+      <ellipse class="lamp" id="headL" cx="125" cy="70" rx="14" ry="6"/>
+      <ellipse class="lamp" id="headR" cx="195" cy="70" rx="14" ry="6"/>
+      <rect class="lamp" id="tailL" x="111" y="278" width="28" height="8" rx="2"/>
+      <rect class="lamp" id="tailR" x="181" y="278" width="28" height="8" rx="2"/>
+      <g id="indicators">
+        <circle cx="107" cy="82" r="5"/><circle cx="213" cy="82" r="5"/>
+        <circle cx="107" cy="268" r="5"/><circle cx="213" cy="268" r="5"/>
+        <circle cx="99" cy="126" r="4"/><circle cx="221" cy="126" r="4"/>
+      </g>
+      <text id="lockText" x="160" y="318" text-anchor="middle">—</text>
+    </svg>
+
+    <div class="status">
+      <div class="mode" id="mode">—</div>
+      <dl>
+        <dt>Tempo restante</dt><dd id="stTimer">—</dd>
+        <dt>Re-travamento</dt><dd id="stRelock">—</dd>
+        <dt>Luz interna</dt><dd id="stInterior">—</dd>
+        <dt>Sensor de luz</dt><dd id="stSensor">—</dd>
+        <dt>Proteção bateria</dt><dd id="stSaver">—</dd>
+        <dt>Saídas</dt><dd id="stOut">—</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section class="card logcard">
+    <h3>Eventos</h3>
+    <ol id="log"></ol>
+  </section>
+
+  <section class="card chartcard">
+    <canvas id="chart"></canvas>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

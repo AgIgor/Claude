@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Arrancada 402 · Protótipo do Dinamômetro</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 fill=%27%230b2742%27/%3E%3Cpath d=%27M5 24 A11 11 0 0 1 27 24%27 fill=%27none%27 stroke=%27%23ffc24b%27 stroke-width=%273%27/%3E%3Cpath d=%27M16 24 L23 13%27 stroke=%27%23e8f1fa%27 stroke-width=%273%27 stroke-linecap=%27round%27/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="topo">
+    <div class="marca">
+      <span class="marca-nome">ARRANCADA <b>402</b></span>
+      <span class="marca-sub">protótipo · bancada de preparação</span>
+    </div>
+    <div class="carro-info">
+      <span class="carro-nome" id="carro-nome"></span>
+      <span class="carro-motor" id="carro-motor"></span>
+    </div>
+    <div class="status">
+      <div class="vida" title="Vida do motor">
+        <span class="rotulo">Motor</span>
+        <div class="vida-barra"><div class="vida-preenche" id="vida-preenche"></div></div>
+        <span class="mono" id="vida-texto"></span>
+      </div>
+      <div class="custo"><span class="rotulo">Preparação</span><span class="mono" id="custo-texto"></span></div>
+      <button type="button" class="botao-icone" id="som" aria-label="Ligar ou desligar o som" aria-pressed="true"></button>
+    </div>
+    <nav class="abas-principais" aria-label="Telas">
+      <button type="button" class="aba ativa" data-tela="dino">Dinamômetro</button>
+      <button type="button" class="aba" data-tela="pista">Pista</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="tela ativa" id="tela-dino" aria-label="Dinamômetro">
+      <aside class="lateral">
+        <div class="abas-lateral" role="tablist">
+          <button type="button" class="sub-aba ativa" data-painel="pecas">Peças</button>
+          <button type="button" class="sub-aba" data-painel="mapa">Mapa</button>
+          <button type="button" class="sub-aba" data-painel="clima">Condições</button>
+        </div>
+        <div class="painel ativo" id="painel-pecas"></div>
+        <div class="painel" id="painel-mapa"></div>
+        <div class="painel" id="painel-clima"></div>
+      </aside>
+
+      <div class="bancada">
+        <div class="mostradores" id="mostradores"></div>
+
+        <div class="cartao grafico-cartao">
+          <div class="cartao-topo">
+            <h2>Curva de potência e torque</h2>
+            <div class="legenda"><span><i class="traco cheio"></i>cv na roda</span><span><i class="traco tracejado"></i>torque kgfm</span></div>
+          </div>
+          <div class="grafico-area"><canvas id="grafico-dino"></canvas></div>
+        </div>
+
+        <div class="acoes">
+          <button type="button" class="botao-puxar" id="puxar">PUXAR NO DINO</button>
+          <div class="resultado" id="resultado"></div>
+          <div class="puxadas" id="puxadas"></div>
+        </div>
+
+        <div class="inferior">
+          <div class="cartao">
+            <div class="cartao-topo">
+              <h2>Datalog</h2>
+              <div class="canais" id="canais"></div>
+            </div>
+            <div class="grafico-area pequeno"><canvas id="grafico-log"></canvas></div>
+          </div>
+          <div class="cartao">
+            <div class="cartao-topo"><h2>Observações do preparador</h2></div>
+            <ul class="observacoes" id="observacoes"></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tela" id="tela-pista" aria-label="Pista"></section>
+  </main>
+
+  <div class="aviso-quebra" id="aviso-quebra" hidden></div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

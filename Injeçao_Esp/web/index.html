@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ECU ESP32</title>
+<style>
+:root{--bg:#111418;--panel:#1b2026;--panel2:#232a32;--line:#2f3842;--txt:#e6e9ec;--dim:#8b96a3;--acc:#3fa7ff;--ok:#38c172;--warn:#f6ad35;--bad:#ef5350}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+header h1{font-size:16px;margin:0 8px 0 0}
+nav{display:flex;flex-wrap:wrap;gap:4px}
+nav button,.btn{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;font:inherit}
+nav button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.warn{background:var(--warn);border-color:var(--warn);color:#000}
+.btn:disabled{opacity:.4;cursor:default}
+.spacer{flex:1}
+.chip{display:inline-block;padding:2px 8px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);font-size:12px;color:var(--dim)}
+.chip.ok{background:#173d27;border-color:var(--ok);color:#bff0d1}
+.chip.warn{background:#4a3511;border-color:var(--warn);color:#ffe2b0}
+.chip.bad{background:#4a1717;border-color:var(--bad);color:#ffc9c9}
+main{padding:12px;max-width:1200px;margin:0 auto}
+section{display:none}section.on{display:block}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.tile .l{color:var(--dim);font-size:12px}
+.tile .v{font-size:26px;font-variant-numeric:tabular-nums;font-weight:600}
+.tile .u{color:var(--dim);font-size:12px;margin-left:3px}
+.tile.big .v{font-size:40px}
+.bar{height:4px;background:var(--panel2);border-radius:2px;margin-top:4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--acc)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:12px}
+.card h3{margin:0 0 10px;font-size:15px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.grid-form{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:6px 16px}
+.grid-form label{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--dim)}
+input,select{background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:5px;padding:5px 6px;font:inherit}
+input[type=number]{width:96px;text-align:right}
+.tblwrap{overflow:auto;max-width:100%}
+table.map{border-collapse:collapse;user-select:none;font-variant-numeric:tabular-nums;font-size:12px}
+table.map td{border:1px solid #0006;min-width:44px;height:24px;text-align:center;padding:0 2px;cursor:cell;color:#000}
+table.map td.ax{background:var(--panel2);color:var(--dim);font-weight:600;cursor:pointer}
+table.map td.sel{outline:2px solid #fff;outline-offset:-2px}
+table.map td.live{box-shadow:inset 0 0 0 3px #000,inset 0 0 0 5px #fff}
+table.map input{width:42px;padding:0;text-align:center;font-size:12px}
+.curve{display:grid;grid-template-columns:1fr 280px;gap:12px}
+.curve table{border-collapse:collapse}
+.curve td{padding:1px}
+.curve td input{width:58px}
+canvas{background:var(--bg);border:1px solid var(--line);border-radius:6px;width:100%}
+.hint{color:var(--dim);font-size:12px}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:8px 14px;border-radius:8px;display:none;z-index:9}
+@media (max-width:700px){.curve{grid-template-columns:1fr}.tile .v{font-size:22px}.tile.big .v{font-size:30px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>ECU ESP32</h1>
+  <nav id="nav">
+    <button data-s="dash" class="on">Painel</button>
+    <button data-s="maps">Mapas</button>
+    <button data-s="curves">Curvas</button>
+    <button data-s="cfg">Configuração</button>
+    <button data-s="test">Testes</button>
+    <button data-s="log">Log</button>
+  </nav>
+  <span class="spacer"></span>
+  <span id="conn" class="chip bad">desconectado</span>
+  <span id="dirty" class="chip" style="display:none">alterações não gravadas</span>
+  <button class="btn pri" id="burn">Gravar na flash</button>
+</header>
+<main>
+
+<section id="dash" class="on">
+  <div class="tiles" id="tiles"></div>
+  <div class="chips" id="flags"></div>
+  <div class="card" id="knockCard" style="display:none"><h3>Detonação por cilindro</h3><div class="tiles" id="knockTiles"></div>
+    <p class="hint">Nível = sinal integrado na janela (0-1023). Ajuste a curva "Limiar de detonação" um pouco acima do nível normal de cada rotação.</p></div>
+  <p class="hint">Alterações em mapas e configurações valem na hora (RAM). Para manter após desligar, use <b>Gravar na flash</b> com o motor parado.</p>
+</section>
+
+<section id="maps">
+  <div class="card">
+    <div class="row">
+      <select id="tblSel">
+        <option value="ve">VE - eficiência volumétrica (%)</option>
+        <option value="ign">Avanço de ignição (° APMS)</option>
+        <option value="lambda">Lambda alvo</option>
+      </select>
+      <input type="number" id="tblVal" step="any" placeholder="valor">
+      <button class="btn" data-op="set">Definir</button>
+      <button class="btn" data-op="add">+ somar</button>
+      <button class="btn" data-op="mul">× %</button>
+      <button class="btn" data-op="interp">Interpolar</button>
+      <button class="btn" id="applyCl" title="Multiplica a célula ativa pela correção atual da malha fechada">Aplicar correção da sonda</button>
+    </div>
+    <p class="hint">Clique e arraste para selecionar. Teclas: <b>+</b>/<b>-</b> ajustam, <b>Shift</b> = passo maior, <b>Enter</b> edita. Duplo clique edita a célula ou o eixo. A célula com borda branca é onde o motor está agora.</p>
+    <div class="tblwrap"><table class="map" id="tbl"></table></div>
+  </div>
+</section>
+
+<section id="curves"><div id="curveList"></div></section>
+
+<section id="cfg"><div id="cfgForm"></div>
+  <div class="card"><h3>Sistema</h3>
+    <div class="row">
+      <button class="btn warn" id="defaults">Restaurar padrões</button>
+      <button class="btn" id="reboot">Reiniciar ECU</button>
+      <button class="btn" id="exportCfg">Exportar configuração</button>
+      <label class="btn">Importar configuração<input type="file" id="importCfg" accept=".json" hidden></label>
+    </div>
+    <p class="hint">Wi-Fi: alterações valem após gravar e reiniciar.</p>
+  </div>
+</section>
+
+<section id="test">
+  <div class="card"><h3>Teste de saídas (somente com motor parado)</h3>
+    <div class="row">
+      <select id="tType">
+        <option value="0">Bico</option><option value="1">Bobina</option>
+        <option value="2">Ventoinha 1</option><option value="3">Ventoinha 2</option><option value="4">Bomba</option><option value="5">Compressor A/C</option>
+      </select>
+      <select id="tCh"><option value="0">Cil. 1</option><option value="1">Cil. 2</option><option value="2">Cil. 3</option><option value="3">Cil. 4</option></select>
+      <label>pulsos <input type="number" id="tCount" value="10"></label>
+      <label>tempo ms <input type="number" id="tMs" value="3" step="any"></label>
+      <label>intervalo ms <input type="number" id="tInt" value="500"></label>
+      <button class="btn pri" id="tGo">Executar</button>
+    </div>
+    <p class="hint">Bico/bobina: "tempo" é a largura de cada pulso. Ventoinha/bomba/compressor: liga pelo "tempo" em ms.<br>
+    Cuidado: teste de bico com a bomba ligada injeta combustível no coletor. Teste de bobina gera faísca: vela aterrada, longe de combustível.</p>
+  </div>
+  <div class="card"><h3>Marcha lenta manual</h3>
+    <div class="row"><label>posição % <input type="number" id="idleMan" value="30" step="any"></label>
+      <button class="btn pri" id="idleSet">Fixar</button><button class="btn" id="idleAuto">Voltar ao automático</button></div>
+    <p class="hint">Funciona com o motor ligado. Use para levantar a curva "posição base": com o motor quente, ajuste até a rotação ficar no alvo e anote o valor.</p>
+  </div>
+</section>
+
+<section id="log">
+  <div class="card"><h3>Registro de dados</h3>
+    <div class="row">
+      <button class="btn pri" id="logBtn">Iniciar gravação</button>
+      <button class="btn" id="logSave" disabled>Baixar CSV</button>
+      <span id="logInfo" class="hint">0 amostras</span>
+    </div>
+    <p class="hint">Grava no navegador a 20 amostras/s. Abra o CSV no Excel/LibreOffice ou no MegaLogViewer.</p>
+  </div>
+</section>
+</main>
+<div id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+let cfg=null, L={}, ws=null;
+
+function toast(m,ms=2500){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',ms)}
+async function api(path,body){
+  const r=await fetch(path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok||j.ok===false){toast(j.msg||('erro '+r.status));throw new Error(j.msg)}
+  return j;
+}
+const pending={};let sendT=null;
+function queue(obj){Object.assign(pending,obj);clearTimeout(sendT);sendT=setTimeout(flush,300)}
+async function flush(){const b={...pending};for(const k in pending)delete pending[k];if(Object.keys(b).length)await api('/api/config',b)}
+
+// ---------------- navegação
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('main section').forEach(s=>s.classList.toggle('on',s.id===b.dataset.s));
+  if(b.dataset.s==='curves')drawCurves();
+});
+
+// ---------------- painel
+const TILES=[['rpm','RPM','',0,8000,1],['map','MAP','kPa',0,110],['clt','Água','°C',-20,120],['iat','Ar','°C',-20,80],
+['o2','Sonda','V',0,1,0,3],['tps','TPS','%',0,100],['vbat','Bateria','V',8,16,0,2],['pw','Pulso','ms',0,20,0,2],
+['duty','Duty bico','%',0,100],['adv','Avanço','°',-10,45],['dwell','Dwell','ms',0,8,0,2],['ve','VE','%',0,120],
+['lam','λ alvo','',0.7,1.2,0,2],['warm','Aquecimento','%',100,200],['ae','Aceleração','%',0,100],['ase','Pós-partida','%',0,100],
+['cl','Correção sonda','%',-20,20],['idle','Válvula lenta','%',0,100],['idleT','Alvo lenta','rpm',500,1600],
+['idleAdv','Avanço lenta','°',-6,6],['knMax','Detonação','',0,1023],['krMax','Retardo','°',0,10],
+['req','ReqFuel','ms',0,20,0,2],['mapDot','MAP/s','kPa/s',-300,300],['loop','Ciclo','µs',0,1000]];
+$('#tiles').innerHTML=TILES.map(([k,l,u,,, big])=>`<div class="tile${big?' big':''}"><div class="l">${l}</div><span class="v" id="t_${k}">-</span><span class="u">${u}</span><div class="bar"><i id="b_${k}"></i></div></div>`).join('');
+function chip(on,txt,cls){return `<span class="chip ${on?cls:''}">${txt}</span>`}
+function renderDash(){
+  for(const [k,,,mn,mx,,dp] of TILES){const v=L[k];if(v===undefined)continue;
+    $('#t_'+k).textContent=(+v).toFixed(dp||(Math.abs(v)<10&&v%1?1:0));
+    $('#b_'+k).style.width=Math.max(0,Math.min(100,(v-mn)/(mx-mn)*100))+'%'}
+  const f=L.fault||0;
+  $('#flags').innerHTML=chip(L.sync,L.sync?'sincronizado':'sem sincronismo','ok')+chip(L.cam,'fase OK','ok')+
+    chip(1,L.seq?'sequencial':'centelha perdida / semissequencial','')+chip(L.crank,'partida','warn')+
+    chip(L.run&&!L.crank,'funcionando','ok')+chip(L.clOn,'malha fechada','ok')+chip(L.revCut,'corte de giro','bad')+
+    chip(L.dfco,'corte desaceleração','warn')+chip(L.idleCl,'lenta em malha fechada','ok')+chip(L.acReq,'A/C pedido','warn')+chip(L.acOn,'compressor','ok')+chip(L.krMax>0,'retardando por detonação','bad')+chip(L.fan1,'ventoinha 1','ok')+chip(L.fan2,'ventoinha 2','ok')+chip(L.pump,'bomba','ok')+
+    chip(L.o2>0.45,L.o2>0.45?'sonda: rico':'sonda: pobre','')+
+    (f&1?chip(1,'falha MAP','bad'):'')+(f&2?chip(1,'falha sensor água','bad'):'')+(f&4?chip(1,'falha sensor ar','bad'):'')+(f&8?chip(1,'falha TPS','bad'):'')+
+    chip(1,'perdas de sinc.: '+L.syncLoss,L.syncLoss?'warn':'');
+  $('#dirty').style.display=L.dirty?'':'none';$('#dirty').className='chip warn';
+  if(cfg&&cfg.knockEnabled&&L.kn){$('#knockCard').style.display='';const nm=L.seq?['Cil. 1','Cil. 2','Cil. 3','Cil. 4']:['Cil. 1/4','Cil. 2/3'];
+    $('#knockTiles').innerHTML=nm.map((n,i)=>`<div class="tile"><div class="l">${n}</div><span class="v">${L.kn[i]}</span><span class="u">-${L.kr[i].toFixed(1)}°</span><div class="bar"><i style="width:${L.kn[i]/10.23}%"></i></div></div>`).join('')+
+    `<div class="tile"><div class="l">Eventos</div><span class="v">${L.knCount}</span></div>`}
+  else $('#knockCard').style.display='none';
+}
+
+// ---------------- websocket
+function connect(){
+  ws=new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen=()=>{$('#conn').className='chip ok';$('#conn').textContent='conectado'};
+  ws.onclose=()=>{$('#conn').className='chip bad';$('#conn').textContent='desconectado';setTimeout(connect,1500)};
+  ws.onmessage=e=>{L=JSON.parse(e.data);renderDash();markLive();logPush();if($('#curves').classList.contains('on'))drawCurves()};
+}
+
+// ---------------- mapas
+const TINFO={ve:{step:1,big:5,dp:0},ign:{step:0.5,big:2,dp:1},lambda:{step:0.01,big:0.05,dp:2}};
+let tName='ve',sel=null,drag=null;
+const T=()=>cfg[tName];
+function color(v,mn,mx){const p=mx>mn?(v-mn)/(mx-mn):0.5;return `hsl(${(1-p)*220},70%,${55+10*Math.sin(p*3.14)}%)`}
+function renderTable(){
+  const t=T(),info=TINFO[tName],z=t.z;let mn=Infinity,mx=-Infinity;z.forEach(v=>{mn=Math.min(mn,v);mx=Math.max(mx,v)});
+  let h='';
+  for(let r=15;r>=0;r--){h+=`<tr><td class="ax" data-ay="${r}">${t.y[r]}</td>`;
+    for(let c=0;c<16;c++){const v=z[r*16+c];h+=`<td data-r="${r}" data-c="${c}" style="background:${color(v,mn,mx)}">${v.toFixed(info.dp)}</td>`}
+    h+='</tr>'}
+  h+='<tr><td class="ax">kPa\\rpm</td>'+t.x.map((v,i)=>`<td class="ax" data-ax="${i}">${v}</td>`).join('')+'</tr>';
+  $('#tbl').innerHTML=h;paintSel();markLive();
+}
+function inSel(r,c){return sel&&r>=Math.min(sel.r0,sel.r1)&&r<=Math.max(sel.r0,sel.r1)&&c>=Math.min(sel.c0,sel.c1)&&c<=Math.max(sel.c0,sel.c1)}
+function paintSel(){document.querySelectorAll('#tbl td[data-r]').forEach(td=>td.classList.toggle('sel',inSel(+td.dataset.r,+td.dataset.c)))}
+function axisIdx(a,v){let i=0;while(i<15&&v>=a[i+1])i++;const f=a[i+1]>a[i]?(v-a[i])/(a[i+1]-a[i]):0;return Math.min(15,Math.max(0,f>0.5?i+1:i))}
+let lastLive='';
+function markLive(){
+  if(!cfg||!$('#maps').classList.contains('on'))return;const t=T();
+  const k=axisIdx(t.y,L.map||0)+','+axisIdx(t.x,L.rpm||0);if(k===lastLive&&$('#tbl .live'))return;lastLive=k;
+  document.querySelectorAll('#tbl td.live').forEach(td=>td.classList.remove('live'));
+  const [r,c]=k.split(',');const td=$(`#tbl td[data-r="${r}"][data-c="${c}"]`);if(td)td.classList.add('live');
+}
+function cells(){const out=[];if(!sel)return out;for(let r=Math.min(sel.r0,sel.r1);r<=Math.max(sel.r0,sel.r1);r++)for(let c=Math.min(sel.c0,sel.c1);c<=Math.max(sel.c0,sel.c1);c++)out.push([r,c]);return out}
+function changed(){renderTable();queue({[tName]:{x:T().x,y:T().y,z:T().z}})}
+function op(kind,val){
+  const z=T().z,info=TINFO[tName],cs=cells();if(!cs.length)return toast('selecione células');
+  const rd=v=>+v.toFixed(info.dp+1);
+  if(kind==='interp'){const r0=Math.min(sel.r0,sel.r1),r1=Math.max(sel.r0,sel.r1),c0=Math.min(sel.c0,sel.c1),c1=Math.max(sel.c0,sel.c1);
+    const g=(r,c)=>z[r*16+c],a=g(r0,c0),b=g(r0,c1),c=g(r1,c0),d=g(r1,c1);
+    for(const [r,cc] of cs){const fx=c1>c0?(cc-c0)/(c1-c0):0,fy=r1>r0?(r-r0)/(r1-r0):0;
+      z[r*16+cc]=rd((a*(1-fx)+b*fx)*(1-fy)+(c*(1-fx)+d*fx)*fy)}}
+  else for(const [r,c] of cs){const i=r*16+c;
+    if(kind==='set')z[i]=val;else if(kind==='add')z[i]=rd(z[i]+val);else if(kind==='mul')z[i]=rd(z[i]*(1+val/100))}
+  changed();
+}
+document.querySelectorAll('[data-op]').forEach(b=>b.onclick=()=>{const v=parseFloat($('#tblVal').value);
+  if(b.dataset.op!=='interp'&&isNaN(v))return toast('informe um valor');op(b.dataset.op,v)});
+$('#tblSel').onchange=e=>{tName=e.target.value;sel=null;lastLive='';renderTable()};
+$('#tbl').addEventListener('mousedown',e=>{const td=e.target.closest('td[data-r]');if(!td)return;
+  const r=+td.dataset.r,c=+td.dataset.c;sel={r0:r,c0:c,r1:r,c1:c};drag=true;paintSel()});
+$('#tbl').addEventListener('mouseover',e=>{if(!drag)return;const td=e.target.closest('td[data-r]');if(!td)return;sel.r1=+td.dataset.r;sel.c1=+td.dataset.c;paintSel()});
+window.addEventListener('mouseup',()=>drag=false);
+$('#tbl').addEventListener('touchstart',e=>{const td=e.target.closest('td[data-r]');if(!td)return;const r=+td.dataset.r,c=+td.dataset.c;
+  if(sel&&e.touches.length===1&&sel._t&&Date.now()-sel._t<400){sel.r1=r;sel.c1=c}else sel={r0:r,c0:c,r1:r,c1:c};sel._t=Date.now();paintSel()},{passive:true});
+function inlineEdit(td,get,set){
+  const inp=document.createElement('input');inp.value=get();td.textContent='';td.appendChild(inp);inp.focus();inp.select();
+  const done=ok=>{if(ok){const v=parseFloat(inp.value);if(!isNaN(v))set(v)}renderTable();if(ok)changed()};
+  inp.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')done(true);if(e.key==='Escape')done(false)};inp.onblur=()=>done(true);
+}
+$('#tbl').addEventListener('dblclick',e=>{const td=e.target.closest('td');if(!td)return;const t=T();
+  if(td.dataset.r!==undefined){const i=+td.dataset.r*16+ +td.dataset.c;inlineEdit(td,()=>t.z[i],v=>t.z[i]=v)}
+  else if(td.dataset.ax!==undefined){const i=+td.dataset.ax;inlineEdit(td,()=>t.x[i],v=>t.x[i]=v)}
+  else if(td.dataset.ay!==undefined){const i=+td.dataset.ay;inlineEdit(td,()=>t.y[i],v=>t.y[i]=v)}});
+window.addEventListener('keydown',e=>{
+  if(!$('#maps').classList.contains('on')||!sel||e.target.tagName==='INPUT')return;const info=TINFO[tName];
+  if(e.key==='+'||e.key==='='){op('add',e.shiftKey?info.big:info.step);e.preventDefault()}
+  else if(e.key==='-'||e.key==='_'){op('add',-(e.shiftKey?info.big:info.step));e.preventDefault()}
+  else if(e.key==='Enter'){const td=$(`#tbl td[data-r="${sel.r0}"][data-c="${sel.c0}"]`);td&&td.dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))}
+  else if(e.key.startsWith('Arrow')){const d={ArrowUp:[1,0],ArrowDown:[-1,0],ArrowLeft:[0,-1],ArrowRight:[0,1]}[e.key];
+    const r=Math.max(0,Math.min(15,sel.r1+d[0])),c=Math.max(0,Math.min(15,sel.c1+d[1]));
+    if(e.shiftKey){sel.r1=r;sel.c1=c}else sel={r0:r,c0:c,r1:r,c1:c};paintSel();e.preventDefault()}
+});
+$('#applyCl').onclick=()=>{
+  if(tName!=='ve')return toast('selecione a tabela VE');if(!L.clOn)return toast('malha fechada não está ativa');
+  const t=T(),r=axisIdx(t.y,L.map),c=axisIdx(t.x,L.rpm);sel={r0:r,c0:c,r1:r,c1:c};op('mul',L.cl);toast(`célula ajustada em ${L.cl.toFixed(1)}%`)};
+
+// ---------------- curvas
+const CURVES={warmup:['Enriquecimento de aquecimento','Água °C','%','clt'],crankEnrich:['Enriquecimento na partida','Água °C','%','clt'],
+  deadTime:['Tempo morto dos bicos','Bateria V','ms','vbat'],dwell:['Tempo de carga da bobina (dwell)','Bateria V','ms','vbat'],
+  cltAdvance:['Correção de avanço pela temperatura','Água °C','°','clt'],
+  idleTarget:['Rotação alvo da marcha lenta','Água °C','rpm','clt'],idleBase:['Posição base da válvula de marcha lenta','Água °C','%','clt'],
+  knockThreshold:['Limiar de detonação','RPM','nível','rpm']};
+function renderCurves(){
+  $('#curveList').innerHTML=Object.entries(CURVES).map(([k,[t,xl,yl]])=>`<div class="card"><h3>${t}</h3><div class="curve"><table>
+    <tr><td class="hint">${xl}</td>${cfg[k].x.map((v,i)=>`<td><input type="number" step="any" data-c="${k}" data-a="x" data-i="${i}" value="${v}"></td>`).join('')}</tr>
+    <tr><td class="hint">${yl}</td>${cfg[k].y.map((v,i)=>`<td><input type="number" step="any" data-c="${k}" data-a="y" data-i="${i}" value="${v}"></td>`).join('')}</tr>
+    </table><canvas id="cv_${k}" width="560" height="260"></canvas></div></div>`).join('');
+  document.querySelectorAll('#curveList input').forEach(inp=>inp.onchange=()=>{
+    const k=inp.dataset.c;cfg[k][inp.dataset.a][+inp.dataset.i]=parseFloat(inp.value);queue({[k]:cfg[k]});drawCurves()});
+  drawCurves();
+}
+function drawCurves(){
+  if(!cfg)return;
+  for(const [k,[, , ,lk]] of Object.entries(CURVES)){const cv=$('#cv_'+k);if(!cv)continue;const g=cv.getContext('2d'),W=cv.width,H=cv.height,c=cfg[k];
+    const xs=c.x,ys=c.y,x0=Math.min(...xs),x1=Math.max(...xs);let y0=Math.min(...ys),y1=Math.max(...ys);if(y1===y0){y0-=1;y1+=1}
+    const pad=30,X=v=>pad+(v-x0)/(x1-x0||1)*(W-2*pad),Y=v=>H-pad-(v-y0)/(y1-y0)*(H-2*pad);
+    g.clearRect(0,0,W,H);g.strokeStyle='#2f3842';g.fillStyle='#8b96a3';g.font='11px sans-serif';
+    for(let i=0;i<=4;i++){const yv=y0+(y1-y0)*i/4;g.beginPath();g.moveTo(pad,Y(yv));g.lineTo(W-pad,Y(yv));g.stroke();g.fillText(yv.toFixed(1),2,Y(yv)+4)}
+    xs.forEach(v=>g.fillText(v,X(v)-8,H-10));
+    g.strokeStyle='#3fa7ff';g.lineWidth=2;g.beginPath();xs.forEach((v,i)=>i?g.lineTo(X(v),Y(ys[i])):g.moveTo(X(v),Y(ys[i])));g.stroke();
+    g.fillStyle='#3fa7ff';xs.forEach((v,i)=>{g.beginPath();g.arc(X(v),Y(ys[i]),3,0,7);g.fill()});
+    const lv=L[lk];if(lv!==undefined){const xv=Math.max(x0,Math.min(x1,lv));g.strokeStyle='#f6ad35';g.lineWidth=1;g.beginPath();g.moveTo(X(xv),pad);g.lineTo(X(xv),H-pad);g.stroke()}
+  }
+}
+
+// ---------------- configuração
+const B='bool',E1=[['0','descida'],['1','subida']];
+const FORM=[
+ ['Motor e combustível',[['displacementCc','Cilindrada total (cc)'],['injFlowCcMin','Vazão do bico (cc/min)'],['stoichAfr','AFR estequiométrico'],['fuelDensity','Densidade combustível (g/cm³)']]],
+ ['Roda fônica e fase',[['teeth','Dentes (incluindo falhas)'],['missingTeeth','Dentes faltantes'],['ckpRisingEdge','Borda do rotação',E1],['tdcOffset','PMS cil.1 após a falha (°, 0-719)'],['camEnabled','Usar sensor de fase',B],['camRisingEdge','Borda da fase',E1],['camCountA','Pulsos de fase na volta A'],['camCountB','Pulsos de fase na volta B']]],
+ ['Injeção',[['injEndAngle','Fim da injeção (° antes do PMS)'],['crankRpm','RPM limite de partida'],['maxDutyPct','Duty máximo (%)'],['afterStartPct','Pós-partida inicial (%)'],['afterStartSec','Pós-partida duração (s)']]],
+ ['Aceleração rápida',[['aeMapdotThresh','Limiar MAP (kPa/s)'],['aeTpsdotThresh','Limiar TPS (%/s)'],['aePct','Enriquecimento (%)'],['aeDurationMs','Duração (ms)']]],
+ ['Corte em desaceleração',[['dfcoEnabled','Ativado',B],['dfcoRpm','Acima de RPM'],['dfcoMap','Abaixo de MAP (kPa)']]],
+ ['Ignição',[['crankAdvance','Avanço na partida (°)'],['crankDwellMs','Dwell na partida (ms)'],['maxDwellMs','Dwell máximo (ms)'],['fixedAdvanceOn','Travar avanço (calibração)',B],['fixedAdvance','Avanço travado (°)'],['outputLatencyUs','Atraso do opto (µs)'],['revLimit','Corte de giro (RPM)'],['revLimitHyst','Histerese do corte (RPM)']]],
+ ['Malha fechada (sonda)',[['closedLoop','Ativada',B],['clMinClt','Água mínima (°C)'],['clMinRpm','RPM mínimo'],['clMaxRpm','RPM máximo'],['clMaxMap','MAP máximo (kPa)'],['clDelaySec','Espera após partida (s)'],['clStepPct','Passo (% a cada 50 ms)'],['clLimitPct','Limite (±%)'],['o2Threshold','Limiar rico/pobre (V)']]],
+ ['Sensor MAP',[['mapV1','Ponto 1: tensão (V)'],['mapKpa1','Ponto 1: pressão (kPa)'],['mapV2','Ponto 2: tensão (V)'],['mapKpa2','Ponto 2: pressão (kPa)'],['mapFilter','Filtro (0-1, 1 = sem filtro)'],['divMap','Divisor da entrada']]],
+ ['Sensores de temperatura (NTC)',[['ntcPullup','Resistor pull-up (Ω)'],['cltR25','Água: R a 25°C (Ω)'],['cltBeta','Água: Beta'],['iatR25','Ar: R a 25°C (Ω)'],['iatBeta','Ar: Beta']]],
+ ['TPS e bateria',[['tpsEnabled','TPS instalado',B],['tpsVmin','TPS fechado (V)'],['tpsVmax','TPS aberto (V)'],['divTps','Divisor TPS'],['divVbat','Divisor bateria']]],
+ ['Ventoinhas e bomba',[['fan1On','Ventoinha 1 liga (°C)'],['fan1Off','Ventoinha 1 desliga (°C)'],['fan2On','Ventoinha 2 liga (°C)'],['fan2Off','Ventoinha 2 desliga (°C)'],['pumpPrimeSec','Escorva da bomba (s)']]],
+ ['Marcha lenta',[['idleType','Atuador',[['0','nenhum'],['1','válvula PWM (2 fios)'],['2','motor de passo (driver STEP/DIR)']]],['idlePwmFreq','Frequência PWM (Hz)'],
+   ['idleStepperMax','Motor de passo: passos do curso'],['idleStepMs','Motor de passo: ms por passo'],['idleStepperDirInvert','Motor de passo: inverter sentido',B],
+   ['idleCrankPos','Posição na partida (%)'],['idleKp','Ganho P (%/rpm)'],['idleKi','Ganho I (%/rpm/s)'],['idleIntLimit','Limite do integrador (%)'],
+   ['idleTpsMax','Com TPS: lenta abaixo de (%)'],['idleActivationRpm','Sem TPS: lenta abaixo de alvo + (rpm)'],['idleDashpotPct','Amortecedor fora da lenta (%)'],
+   ['idleDashpotDecay','Amortecedor: retorno (%/s)'],['idleFanAdder','Adicional com ventoinha (%)'],['idleAdvGain','Correção pelo avanço (°/rpm)'],['idleAdvLimit','Limite da correção pelo avanço (°)']]],
+ ['Ar-condicionado',[['acEnabled','Ativado',B],['acInputActiveHigh','Pedido ativo em nível',[['0','baixo (GND)'],['1','alto']]],['acDelayMs','Atraso para acoplar (ms)'],
+   ['idleAcAdder','Abertura extra da lenta (%)'],['idleAcRpmUp','Aumento do alvo da lenta (rpm)'],['acMinRpm','Desliga abaixo de (rpm)'],['acMaxRpm','Desliga acima de (rpm)'],
+   ['acMaxClt','Desliga com água acima de (°C)'],['acWotTps','Desliga com TPS acima de (%)'],['acWotCutSec','Tempo desligado na aceleração (s)'],
+   ['acFan','Ventoinha junto',[['0','nenhuma'],['1','ventoinha 1'],['2','ventoinha 2']]]]],
+ ['Detonação (TPIC8101)',[['knockEnabled','Ativado',B],['knockFreqKhz','Frequência (kHz)'],['knockGainIdx','Ganho (índice 0-63, maior = menos ganho)'],
+   ['knockIntegIdx','Integrador (índice 0-31)'],['knockWinStart','Janela: início (° após PMS)'],['knockWinLen','Janela: duração (°)'],
+   ['knockMinRpm','Ativo acima de (rpm)'],['knockMinMap','Ativo acima de MAP (kPa)'],['knockRetardStep','Retardo por evento (°)'],
+   ['knockMaxRetard','Retardo máximo (°)'],['knockRecoverDegSec','Recuperação (°/s)']]],
+ ['Saídas',[['injInvert','Inverter saída dos bicos',B],['ignInvert','Inverter saída das bobinas',B]]],
+ ['Wi-Fi',[['wifiSsid','Nome da rede','text'],['wifiPass','Senha (mín. 8)','text']]],
+];
+function renderForm(){
+  $('#cfgForm').innerHTML=FORM.map(([g,fs])=>`<div class="card"><h3>${g}</h3><div class="grid-form">${fs.map(([k,l,t])=>{
+    const v=cfg[k];let inp;
+    if(t===B)inp=`<input type="checkbox" data-k="${k}" data-t="b" ${v?'checked':''}>`;
+    else if(Array.isArray(t))inp=`<select data-k="${k}" data-t="n">${t.map(([o,n])=>`<option value="${o}" ${+o===v?'selected':''}>${n}</option>`).join('')}</select>`;
+    else if(t==='text')inp=`<input type="text" data-k="${k}" data-t="s" value="${v}">`;
+    else inp=`<input type="number" step="any" data-k="${k}" data-t="n" value="${v}">`;
+    return `<label>${l}${inp}</label>`}).join('')}</div></div>`).join('');
+  document.querySelectorAll('#cfgForm [data-k]').forEach(el=>el.onchange=()=>{
+    const k=el.dataset.k,t=el.dataset.t;const v=t==='b'?(el.checked?1:0):t==='s'?el.value:parseFloat(el.value);
+    if(t==='n'&&isNaN(v))return;cfg[k]=v;queue({[k]:v})});
+}
+
+// ---------------- testes / sistema
+$('#tGo').onclick=()=>api('/api/test',{type:+$('#tType').value,ch:+$('#tCh').value,count:+$('#tCount').value,ms:+$('#tMs').value,interval:+$('#tInt').value}).then(()=>toast('teste iniciado'));
+$('#idleSet').onclick=()=>api('/api/idle',{pos:+$('#idleMan').value}).then(()=>toast('marcha lenta em manual'));
+$('#idleAuto').onclick=()=>api('/api/idle',{pos:-1}).then(()=>toast('marcha lenta automática'));
+$('#burn').onclick=async()=>{await flush();const j=await api('/api/burn',{});toast(j.msg)};
+$('#defaults').onclick=async()=>{if(!confirm('Restaurar todos os padrões? (não grava até clicar em Gravar)'))return;await api('/api/defaults',{});await load();toast('padrões carregados')};
+$('#reboot').onclick=async()=>{if(!confirm('Reiniciar a ECU?'))return;await api('/api/reboot',{});toast('reiniciando...')};
+$('#exportCfg').onclick=()=>download('ecu-config.json',JSON.stringify(cfg,null,1),'application/json');
+$('#importCfg').onchange=async e=>{const f=e.target.files[0];if(!f)return;const j=JSON.parse(await f.text());await api('/api/config',j);await load();toast('configuração importada (não gravada)')};
+function download(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click()}
+
+// ---------------- log
+let logOn=false,logRows=[],logKeys=null,logT0=0;
+$('#logBtn').onclick=()=>{logOn=!logOn;if(logOn){logRows=[];logKeys=null;logT0=performance.now()}
+  $('#logBtn').textContent=logOn?'Parar gravação':'Iniciar gravação';$('#logSave').disabled=logOn||!logRows.length};
+function logPush(){if(!logOn)return;if(!logKeys)logKeys=Object.keys(L);logRows.push([((performance.now()-logT0)/1000).toFixed(2),...logKeys.map(k=>Array.isArray(L[k])?L[k].join(';'):L[k])]);
+  if(logRows.length%20===0)$('#logInfo').textContent=logRows.length+' amostras'}
+$('#logSave').onclick=()=>download('ecu-log-'+new Date().toISOString().slice(0,19).replace(/:/g,'')+'.csv',
+  ['tempo;'+logKeys.map(k=>Array.isArray(L[k])?L[k].map((_,i)=>k+(i+1)).join(';'):k).join(';'),...logRows.map(r=>r.join(';'))].join('\n').replace(/\./g,','),'text/csv');
+
+// ---------------- início
+async function load(){cfg=await api('/api/config');renderTable();renderCurves();renderForm()}
+load().then(connect).catch(()=>{toast('falha ao carregar configuração');connect()});
+</script>
+</body>
+</html>

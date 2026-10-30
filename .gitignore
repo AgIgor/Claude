@@ -1,0 +1,17 @@
+# PlatformIO
+.pio/
+
+# Saidas de build (PyInstaller, host tests, etc.)
+build/
+build_host/
+dist/
+*.o
+*.elf
+
+# Python
+__pycache__/
+*.pyc
+
+# Android / Gradle
+.gradle/
+local.properties

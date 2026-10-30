@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLP ESP32</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">CLP ESP32</div>
+  <div class="status">
+    <span id="conn" class="chip off" title="Conexão com o CLP">offline</span>
+    <span id="runState" class="chip">—</span>
+    <span id="scanInfo" class="muted small"></span>
+  </div>
+  <div class="actions">
+    <button id="btnRun" class="ok">RUN</button>
+    <button id="btnStop" class="danger">STOP</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="ladder" class="active">Ladder</button>
+  <button data-tab="monitor">Monitor</button>
+  <button data-tab="symbols">Variáveis</button>
+  <button data-tab="config">Configuração</button>
+</nav>
+
+<main>
+  <!-- ===================== LADDER ===================== -->
+  <section id="tab-ladder" class="tab active">
+    <div class="toolbar" id="toolbar">
+      <div class="group">
+        <span class="glabel">Contatos</span>
+        <button data-add="no" title="Contato normalmente aberto">┤ ├ NA</button>
+        <button data-add="nc" title="Contato normalmente fechado">┤/├ NF</button>
+        <button data-add="re" title="Borda de subida (1 scan)">┤P├</button>
+        <button data-add="fe" title="Borda de descida (1 scan)">┤N├</button>
+        <button data-add="cmp" title="Comparação de valores">A&gt;B</button>
+      </div>
+      <div class="group">
+        <span class="glabel">Ramos</span>
+        <button data-act="wrap" title="Coloca a seleção dentro de um paralelo (OU)">Paralelo</button>
+        <button data-act="branch" title="Adiciona um ramo ao paralelo que contém a seleção">+ Ramo</button>
+      </div>
+      <div class="group">
+        <span class="glabel">Saídas</span>
+        <button data-add="out" title="Bobina">( )</button>
+        <button data-add="set" title="Liga e mantém">(S)</button>
+        <button data-add="rst" title="Desliga / zera T ou C">(R)</button>
+        <button data-add="ton" title="Retardo para ligar">TON</button>
+        <button data-add="tof" title="Retardo para desligar">TOF</button>
+        <button data-add="tp" title="Pulso de duração fixa">TP</button>
+        <button data-add="ctu" title="Contador crescente">CTU</button>
+        <button data-add="ctd" title="Contador decrescente">CTD</button>
+        <button data-add="mov" title="Copia valor para registrador D">MOV</button>
+      </div>
+      <div class="group">
+        <span class="glabel">Editar</span>
+        <button data-act="edit" title="Editar elemento (duplo clique)">Editar</button>
+        <button data-act="delete" title="Excluir seleção (Del)">Excluir</button>
+      </div>
+      <div class="group">
+        <span class="glabel">Linhas</span>
+        <button data-act="addRung">+ Linha</button>
+        <button data-act="upRung" title="Mover linha para cima">↑</button>
+        <button data-act="downRung" title="Mover linha para baixo">↓</button>
+        <button data-act="delRung">Excluir linha</button>
+      </div>
+    </div>
+
+    <div class="progbar">
+      <button id="btnDownload" class="primary">Enviar ao CLP</button>
+      <button id="btnReload">Recarregar do CLP</button>
+      <button id="btnExport">Exportar</button>
+      <label class="button">Importar<input type="file" id="fileImport" accept=".json,application/json" hidden></label>
+      <label class="check"><input type="checkbox" id="chkMonitor" checked> Monitorar</label>
+      <span id="dirty" class="muted small"></span>
+    </div>
+    <div id="msg" class="msg" hidden></div>
+
+    <div id="rungs" class="rungs"></div>
+    <p class="hint muted small">Clique para selecionar, Shift+clique para selecionar vários elementos em série, duplo clique para editar.
+      Novos contatos entram depois da seleção, e novas saídas vão para a linha selecionada.</p>
+  </section>
+
+  <!-- ===================== MONITOR ===================== -->
+  <section id="tab-monitor" class="tab">
+    <p class="muted small">Clique numa entrada ou saída para forçar: normal → 1 → 0 → normal. Forçados ficam marcados com <b class="fbadge">F</b>.</p>
+    <div class="cards">
+      <div class="card"><h3>Entradas digitais</h3><div id="monI" class="iogrid"></div></div>
+      <div class="card"><h3>Saídas digitais</h3><div id="monQ" class="iogrid"></div></div>
+      <div class="card"><h3>Entradas analógicas</h3><div id="monAI"></div></div>
+      <div class="card"><h3>Registradores D <span class="muted small">(retentivos)</span></h3><div id="monD" class="dgrid"></div></div>
+      <div class="card"><h3>Temporizadores</h3><div id="monT"></div></div>
+      <div class="card"><h3>Contadores</h3><div id="monC"></div></div>
+      <div class="card wide"><h3>Bits internos M</h3><div id="monM" class="mgrid"></div></div>
+      <div class="card"><h3>Sistema</h3><div id="monSys"></div><button id="btnClrMax">Zerar scan máx.</button></div>
+    </div>
+  </section>
+
+  <!-- ===================== SÍMBOLOS ===================== -->
+  <section id="tab-symbols" class="tab">
+    <p class="muted small">Dê nomes às variáveis. Eles aparecem no Ladder e são gravados junto com o programa (use "Enviar ao CLP").</p>
+    <div id="symTables"></div>
+  </section>
+
+  <!-- ===================== CONFIG ===================== -->
+  <section id="tab-config" class="tab">
+    <form id="cfgForm" class="card form">
+      <h3>Rede Wi-Fi</h3>
+      <label>SSID <input name="ssid" autocomplete="off"></label>
+      <label>Senha <input name="pass" type="password" placeholder="(inalterada)" autocomplete="new-password"></label>
+      <label>Hostname <input name="hostname" maxlength="31"> <span class="muted small">acesso por http://&lt;hostname&gt;.local</span></label>
+      <h3>Entradas digitais</h3>
+      <label class="check"><input type="checkbox" name="diPullUp"> Usar pull-up interno (desmarcado = pull-down, para testes com 3,3 V)</label>
+      <div class="muted small">Inverter entrada (ex.: optoacoplador que puxa para GND):</div>
+      <div id="invList" class="invlist"></div>
+      <div class="row">
+        <button type="submit" class="primary">Salvar</button>
+        <span id="cfgMsg" class="small"></span>
+      </div>
+    </form>
+    <div class="card form">
+      <h3>Informações</h3>
+      <div id="infoBox" class="small"></div>
+    </div>
+  </section>
+</main>
+
+<dialog id="dlg">
+  <form method="dialog" id="dlgForm">
+    <h3 id="dlgTitle"></h3>
+    <div id="dlgFields"></div>
+    <div id="dlgErr" class="err small"></div>
+    <div class="row end">
+      <button type="button" id="dlgCancel">Cancelar</button>
+      <button type="submit" class="primary">OK</button>
+    </div>
+  </form>
+</dialog>
+<datalist id="addrList"></datalist>
+
+<script src="app.js"></script>
+</body>
+</html>

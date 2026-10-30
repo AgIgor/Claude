@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "rungs": [
+    {
+      "comment": "Liga/desliga com selo: I0 liga, I1 desliga a luz da sala",
+      "logic": { "t": "s", "items": [
+        { "t": "p", "branches": [
+          { "t": "s", "items": [ { "t": "no", "v": "I0" } ] },
+          { "t": "s", "items": [ { "t": "no", "v": "Q0" } ] }
+        ] },
+        { "t": "nc", "v": "I1" }
+      ] },
+      "outputs": [ { "t": "out", "v": "Q0" } ]
+    },
+    {
+      "comment": "Luz da escada: pulso em I2 mantém Q1 ligada por 30 s depois de soltar",
+      "logic": { "t": "s", "items": [ { "t": "no", "v": "I2" } ] },
+      "outputs": [ { "t": "tof", "v": "T0", "pt": 30000 } ]
+    },
+    {
+      "comment": "",
+      "logic": { "t": "s", "items": [ { "t": "no", "v": "T0" } ] },
+      "outputs": [ { "t": "out", "v": "Q1" } ]
+    },
+    {
+      "comment": "Termostato: liga Q2 quando AI0 passa do valor ajustado em D0",
+      "logic": { "t": "s", "items": [ { "t": "cmp", "op": ">", "a": "AI0", "b": "D0" } ] },
+      "outputs": [ { "t": "out", "v": "Q2" } ]
+    },
+    {
+      "comment": "Botão pulsador I3 alterna Q3 (liga/desliga a cada toque)",
+      "logic": { "t": "s", "items": [ { "t": "re", "v": "I3" }, { "t": "nc", "v": "Q3" } ] },
+      "outputs": [ { "t": "set", "v": "M0" } ]
+    },
+    {
+      "comment": "",
+      "logic": { "t": "s", "items": [ { "t": "re", "v": "I3" }, { "t": "no", "v": "Q3" } ] },
+      "outputs": [ { "t": "rst", "v": "M0" } ]
+    },
+    {
+      "comment": "",
+      "logic": { "t": "s", "items": [ { "t": "no", "v": "M0" } ] },
+      "outputs": [ { "t": "out", "v": "Q3" } ]
+    },
+    {
+      "comment": "LED da placa pisca enquanto o CLP está em RUN",
+      "logic": { "t": "s", "items": [ { "t": "no", "v": "S1" } ] },
+      "outputs": [ { "t": "out", "v": "Q5" } ]
+    }
+  ],
+  "symbols": {
+    "I0": "Liga sala",
+    "I1": "Desliga sala",
+    "I2": "Botão escada",
+    "I3": "Pulsador quarto",
+    "Q0": "Luz sala",
+    "Q1": "Luz escada",
+    "Q2": "Ventilador",
+    "Q3": "Luz quarto",
+    "Q5": "LED placa",
+    "AI0": "Sensor temperatura",
+    "D0": "Setpoint temperatura",
+    "T0": "Tempo escada",
+    "M0": "Memória quarto"
+  }
+}

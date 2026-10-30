@@ -1,0 +1,1388 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0b0d">
+<title>Speeduino Live</title>
+<style>
+:root{
+  --bg:#0e0f12; --panel:#15171c; --panel2:#0b0c0e; --line:#262a31; --text:#e8eaed; --muted:#8b919c;
+  --accent:#3fa9f5; --green:#2ecc71; --red:#ff453a; --yellow:#ffd60a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+button,select,input{font:inherit;color:inherit}
+button{background:#1d2027;border:1px solid #2c313a;border-radius:7px;padding:6px 12px;cursor:pointer}
+button:hover{background:#252932}
+button.primary{background:#1f5f8f;border-color:#2b7bb8}
+button.rec{background:#5c1a17;border-color:#a3302a}
+select,input[type=number],input[type=text]{background:#0f1115;border:1px solid #2c313a;border-radius:6px;padding:5px 8px}
+
+header.top{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:8px 16px;background:#0a0b0d;border-bottom:1px solid var(--line)}
+.brand{font-weight:800;letter-spacing:.1em;font-size:15px}
+.brand span{color:var(--accent)}
+.pill{padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700;white-space:nowrap}
+.pill.ok{background:#12371f;color:#5ee38f}
+.pill.warn{background:#3a3210;color:var(--yellow)}
+.pill.off{background:#3a1414;color:#ff7a70}
+.pill.demo{background:#10283a;color:#6cc4ff}
+.meta{color:var(--muted);font-size:12px;display:flex;gap:12px;flex-wrap:wrap}
+.meta b{color:var(--text);font-weight:600}
+.actions{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.recdot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff453a;margin-right:6px;vertical-align:1px}
+.recording .recdot{animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.2}}
+
+nav.tabs{display:flex;gap:2px;padding:0 16px;background:#0a0b0d;border-bottom:1px solid var(--line);overflow-x:auto}
+nav.tabs button{background:none;border:0;border-bottom:2px solid transparent;border-radius:0;padding:9px 14px;color:var(--muted);white-space:nowrap}
+nav.tabs button.active{color:var(--text);border-bottom-color:var(--accent)}
+
+main{padding:12px 16px 24px;max-width:1600px;margin:0 auto}
+section{display:none}
+section.active{display:block}
+h3{margin:16px 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;display:flex;align-items:center;gap:10px}
+h3 label{font-weight:400;text-transform:none;letter-spacing:0}
+
+.grid-main{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.grid-sec{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+@media (max-width:1000px){.grid-main{grid-template-columns:repeat(2,1fr)}}
+.slot{position:relative;background:var(--panel2);border:1px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer;transition:opacity .3s}
+.grid-main .slot{aspect-ratio:1}
+.grid-sec .slot{height:88px}
+.slot canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.slot:hover{border-color:#3a404b}
+body.stale .slot{opacity:.4}
+
+.ind{display:flex;flex-wrap:wrap;gap:6px}
+.ind span{padding:4px 9px;border-radius:6px;font-size:12px;background:#171a1f;color:#646b77;border:1px solid #22262d;white-space:nowrap}
+.ind span.on{color:#fff;font-weight:600}
+.ind span.on.green{background:#1d7a44;border-color:#2ecc71}
+.ind span.on.red{background:#9e231c;border-color:#ff453a}
+.ind span.on.yellow{background:#8a7300;border-color:var(--yellow)}
+.ind.only-active span:not(.on){display:none}
+
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.toolbar .sep{flex:1}
+.chartwrap{position:relative;height:calc(100vh - 220px);min-height:320px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.chartwrap canvas{position:absolute;inset:0;width:100%;height:100%}
+.trace{display:flex;align-items:center;gap:6px}
+.trace i{width:12px;height:12px;border-radius:3px;display:inline-block}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:5px 10px;border-bottom:1px solid #1d2026}
+th{color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--bg)}
+td.v{font-family:ui-monospace,Consolas,monospace;text-align:right;width:120px}
+td.u{color:var(--muted);width:90px}
+td.o{color:#5b616c;width:70px;font-family:ui-monospace,Consolas,monospace}
+.tablewrap{max-height:calc(100vh - 210px);overflow:auto;border:1px solid var(--line);border-radius:10px}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.card h4{margin:0 0 10px;font-size:14px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;font-family:ui-monospace,Consolas,monospace}
+.big{font-size:28px;font-weight:700;font-family:ui-monospace,Consolas,monospace}
+.muted{color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+
+dialog{background:var(--panel);color:var(--text);border:1px solid #333944;border-radius:12px;padding:0;max-width:min(560px,calc(100vw - 32px));width:100%}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+dialog form{padding:18px}
+dialog h2{margin:0 0 14px;font-size:17px}
+.form{display:grid;grid-template-columns:1fr auto;gap:8px 14px;align-items:center}
+.form label{color:#c3c8d0}
+.form input[type=number]{width:110px}
+.form .full{grid-column:1/-1}
+.form h5{grid-column:1/-1;margin:10px 0 0;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.dlgbtns{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;flex-wrap:wrap}
+.dlgbtns .left{margin-right:auto}
+#gaugeSel{width:100%}
+</style>
+</head>
+<body class="stale">
+
+<header class="top">
+  <div class="brand">SPEEDUINO <span>LIVE</span></div>
+  <div id="conn" class="pill off">Desconectado</div>
+  <div class="meta">
+    <span>ECU <b id="hSig">—</b></span>
+    <span><b id="hHz">0</b> Hz</span>
+    <span>Tempo <b id="hSecl">0</b> s</span>
+  </div>
+  <div class="actions">
+    <button id="btnRec" title="Gravar datalog"><span class="recdot"></span><span id="btnRecTxt">Gravar</span></button>
+    <button id="btnDemo" title="Simular dados sem a ECU">Demo</button>
+    <button id="btnSettings" title="Configurações">⚙</button>
+    <button id="btnFull" title="Tela cheia">⛶</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="dash" class="active">Painel</button>
+  <button data-tab="chart">Gráfico</button>
+  <button data-tab="channels">Canais</button>
+  <button data-tab="log">Datalog e status</button>
+</nav>
+
+<main>
+  <section id="tab-dash" class="active">
+    <div class="grid-main" id="gridMain"></div>
+    <h3>Mostradores secundários</h3>
+    <div class="grid-sec" id="gridSec"></div>
+    <h3>Indicadores <label><input type="checkbox" id="onlyActive"> só ativos</label></h3>
+    <div class="ind" id="indicators"></div>
+    <p class="muted" style="font-size:12px;margin-top:14px">Clique em qualquer mostrador para trocar o canal ou o estilo.</p>
+  </section>
+
+  <section id="tab-chart">
+    <div class="toolbar" id="chartBar"></div>
+    <div class="chartwrap"><canvas id="chartCv"></canvas></div>
+  </section>
+
+  <section id="tab-channels">
+    <div class="toolbar">
+      <input type="text" id="chFilter" placeholder="Filtrar canais…" style="width:240px">
+      <span class="muted" id="chCount"></span>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Canal</th><th style="text-align:right">Valor</th><th>Unidade</th><th>Byte</th></tr></thead>
+        <tbody id="chBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="tab-log">
+    <div class="cards">
+      <div class="card">
+        <h4>Datalog</h4>
+        <div class="big" id="logDur">00:00</div>
+        <div class="muted" id="logInfo">Nenhum dado gravado</div>
+        <div class="row">
+          <button id="btnRec2" class="primary">Iniciar gravação</button>
+          <button id="btnMsl">Baixar .msl</button>
+          <button id="btnCsv">Baixar .csv</button>
+          <button id="btnClear">Limpar</button>
+        </div>
+        <p class="muted" style="font-size:12px;margin-bottom:0">O arquivo .msl abre no MegaLogViewer. O .csv abre em planilhas. A gravação fica na memória do navegador; baixe antes de fechar a página.</p>
+      </div>
+      <div class="card">
+        <h4>Gateway ESP32</h4>
+        <dl class="kv" id="gwStatus"></dl>
+      </div>
+      <div class="card">
+        <h4>Último quadro bruto (130 bytes)</h4>
+        <pre id="rawHex" style="margin:0;font-size:11px;line-height:1.5;color:#9aa1ad;white-space:pre-wrap;word-break:break-all"></pre>
+      </div>
+    </div>
+  </section>
+</main>
+
+<dialog id="dlgGauge">
+  <form method="dialog">
+    <h2>Configurar mostrador</h2>
+    <div class="form">
+      <label class="full">Canal<br><select id="gaugeSel"></select></label>
+      <label>Estilo</label>
+      <select id="gaugeStyle">
+        <option value="analog">Analógico</option>
+        <option value="bar">Barra</option>
+        <option value="digital">Digital</option>
+      </select>
+    </div>
+    <div class="dlgbtns">
+      <button value="cancel">Cancelar</button>
+      <button value="ok" class="primary">Aplicar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgSettings">
+  <form method="dialog">
+    <h2>Configurações</h2>
+    <div class="form">
+      <h5>Unidades e motor</h5>
+      <label>Temperatura</label>
+      <select id="sTemp"><option value="C">°C</option><option value="F">°F</option></select>
+      <label>AFR estequiométrico (stoich)</label><input type="number" id="sStoich" step="0.1">
+      <label>Motor 2 tempos</label><input type="checkbox" id="sTwoStroke">
+      <h5>Conta-giros</h5>
+      <label>RPM máximo da escala</label><input type="number" id="sRpmMax" step="500">
+      <label>RPM de alerta</label><input type="number" id="sRpmWarn" step="100">
+      <label>RPM de perigo</label><input type="number" id="sRpmDang" step="100">
+      <h5>MAP</h5>
+      <label>MAP máximo da escala (kPa)</label><input type="number" id="sMapMax" step="10">
+      <label>MAP de alerta (kPa)</label><input type="number" id="sMapWarn" step="5">
+      <label>MAP de perigo (kPa)</label><input type="number" id="sMapDang" step="5">
+      <h5>Indicadores</h5>
+      <label>Bateria baixa (V)</label><input type="number" id="sBatLow" step="0.1">
+      <label>Bateria alta (V)</label><input type="number" id="sBatHigh" step="0.1">
+      <label>TPS de flood clear (%)</label><input type="number" id="sTpsFlood" step="1">
+      <label>RPM de partida (cranking)</label><input type="number" id="sCrankRpm" step="50">
+    </div>
+    <p class="muted" style="font-size:12px">Esses valores ficam na configuração da ECU e não são enviados no fluxo de dados. Copie do TunerStudio para os mostradores ficarem iguais.</p>
+    <div class="dlgbtns">
+      <button value="reset" class="left" id="btnResetLayout">Restaurar painel padrão</button>
+      <button value="cancel">Cancelar</button>
+      <button value="ok" class="primary">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+'use strict';
+
+/* =========================================================================
+   Canais de saída: espelho de [OutputChannels] do reference/speeduino.ini
+   (ochBlockSize = 130). Valor = (bruto + translate) * escala, little-endian.
+   ========================================================================= */
+const OCH_SIZE = 130;
+
+// nome, tipo, offset, unidade, escala
+const SCALARS = [
+  ['secl','U08',0,'s',1], ['status1','U08',1,'bits',1], ['engine','U08',2,'bits',1],
+  ['syncLossCounter','U08',3,'',1], ['map','U16',4,'kPa',1], ['iatRaw','U08',6,'',1],
+  ['coolantRaw','U08',7,'',1], ['batCorrection','U08',8,'%',1], ['batteryVoltage','U08',9,'V',0.1],
+  ['afr','U08',10,'AFR',0.1], ['egoCorrection','U08',11,'%',1], ['airCorrection','U08',12,'%',1],
+  ['warmupEnrich','U08',13,'%',1], ['rpm','U16',14,'rpm',1], ['accelEnrich','U08',16,'%',2],
+  ['gammaEnrich','U16',17,'%',1], ['VE1','U08',19,'%',1], ['VE2','U08',20,'%',1],
+  ['afrTarget','U08',21,'AFR',0.1], ['TPSdot','S16',22,'%/s',1], ['advance','S08',24,'°',1],
+  ['tps','U08',25,'%',0.5], ['loopsPerSecond','U16',26,'loops',1], ['freeRAM','U16',28,'bytes',1],
+  ['boostTarget','U08',30,'kPa',2], ['boostDuty','U08',31,'%',1], ['status2','U08',32,'bits',1],
+  ['rpmDOT','S16',33,'rpm/s',1], ['flex','U08',35,'%',1], ['flexFuelCor','U08',36,'%',1],
+  ['flexIgnCor','S08',37,'°',1], ['idleLoad','U08',38,'',1], ['testoutputs','U08',39,'bits',1],
+  ['afr2','U08',40,'AFR',0.1], ['baro','U08',41,'kPa',1],
+];
+for (let i = 0; i < 16; i++) SCALARS.push(['auxin_gauge' + i, 'U16', 42 + i * 2, '', 1]);
+SCALARS.push(
+  ['tpsADC','U08',74,'ADC',1], ['errors','U08',75,'bits',1],
+  ['pulseWidth','U16',76,'ms',0.001], ['pulseWidth2','U16',78,'ms',0.001],
+  ['pulseWidth3','U16',80,'ms',0.001], ['pulseWidth4','U16',82,'ms',0.001],
+  ['status3','U08',84,'bits',1], ['engineProtectStatus','U08',85,'bits',1],
+  ['fuelLoad','S16',86,'',1], ['ignLoad','S16',88,'',1], ['dwell','U16',90,'ms',0.001],
+  ['CLIdleTarget','U08',92,'rpm',10], ['MAPdot','S16',93,'kPa/s',1], ['vvt1Angle','S16',95,'°',0.5],
+  ['vvt1Target','U08',97,'°',0.5], ['vvt1Duty','U08',98,'%',0.5], ['flexBoostCor','S16',99,'kPa',1],
+  ['baroCorrection','U08',101,'%',1], ['veCurr','U08',102,'%',1], ['ASECurr','U08',103,'%',1],
+  ['vss','U16',104,'km/h',1], ['gear','U08',106,'',1], ['fuelPressure','U08',107,'PSI',1],
+  ['oilPressure','U08',108,'PSI',1], ['wmiPW','U08',109,'%',1], ['status4','U08',110,'bits',1],
+  ['vvt2Angle','S16',111,'°',0.5], ['vvt2Target','U08',113,'°',0.5], ['vvt2Duty','U08',114,'%',0.5],
+  ['outputsStatus','U08',115,'bits',1], ['fuelTempRaw','U08',116,'',1], ['fuelTempCor','U08',117,'%',1],
+  ['advance1','S08',118,'°',1], ['advance2','S08',119,'°',1], ['sd_status','U08',120,'',1],
+  ['emap','U16',121,'kPa',1], ['fanDuty','U08',123,'%',0.5], ['airConStatus','U08',124,'bits',1],
+  ['dwellActual','U16',125,'ms',0.001], ['status5','U08',127,'bits',1],
+  ['knockEventCount','U08',128,'',1], ['knockCor','U08',129,'°',1],
+);
+
+// nome, offset, bit inicial, bit final
+const BITS = [
+  ['inj1Status',1,0,0], ['inj2Status',1,1,1], ['inj3Status',1,2,2], ['inj4Status',1,3,3],
+  ['DFCOOn',1,4,4], ['boostCutFuel',1,5,5], ['toothLog1Ready',1,6,6], ['toothLog2Ready',1,7,7],
+  ['running',2,0,0], ['crank',2,1,1], ['ase',2,2,2], ['warmup',2,3,3],
+  ['tpsaccaen',2,4,4], ['tpsaccden',2,5,5], ['mapaccaen',2,6,6], ['mapaccden',2,7,7],
+  ['launchHard',32,0,0], ['launchSoft',32,1,1], ['hardLimitOn',32,2,2], ['softlimitOn',32,3,3],
+  ['boostCutSpark',32,4,4], ['error',32,5,5], ['idleControlOn',32,6,6], ['sync',32,7,7],
+  ['testenabled',39,0,0], ['testactive',39,1,1],
+  ['errorNum',75,0,1], ['currentError',75,2,7],
+  ['resetLockOn',84,0,0], ['nitrousOn',84,1,1], ['fuel2Active',84,2,2], ['vssRefresh',84,3,3],
+  ['halfSync',84,4,4], ['nSquirts',84,5,7],
+  ['engineProtectRPM',85,0,0], ['engineProtectMAP',85,1,1], ['engineProtectOil',85,2,2],
+  ['engineProtectAFR',85,3,3], ['engineProtectCoolant',85,4,4], ['engineProtectOth',85,5,6], ['IOError',85,7,7],
+  ['wmiEmptyBit',110,0,0], ['vvt1Error',110,1,1], ['vvt2Error',110,2,2], ['fanStatus',110,3,3],
+  ['burnPending',110,4,4], ['stagingActive',110,5,5],
+  ['outputsStatus0',115,0,0], ['outputsStatus1',115,1,1], ['outputsStatus2',115,2,2], ['outputsStatus3',115,3,3],
+  ['outputsStatus4',115,4,4], ['outputsStatus5',115,5,5], ['outputsStatus6',115,6,6], ['outputsStatus7',115,7,7],
+  ['airConRequest',124,0,0], ['airConCompressor',124,1,1], ['airConRPMMLockout',124,2,2], ['airConTPSLockout',124,3,3],
+  ['airConTurningOn',124,4,4], ['airConCLTLockout',124,5,5], ['airConFanStatus',124,6,6],
+  ['flatShiftHardActive',127,0,0], ['flatShiftSoftActive',127,1,1], ['spark2Active',127,2,2],
+  ['knockActive',127,3,3], ['knockIGNORE',127,4,4],
+];
+
+// Canais calculados (equivalentes às expressões do .ini)
+const DERIVED = [
+  ['coolant','TEMP'], ['iat','TEMP'], ['fuelTemp','TEMP'], ['throttle','%'],
+  ['lambda',''], ['lambdaTarget',''], ['dutyCycle','%'], ['stgDutyCycle','%'],
+  ['map_bar','bar'], ['map_psi','PSI'], ['map_vacboost','inHg/PSI'], ['MAPxRPM',''],
+  ['vssMPH','mph'], ['fuelPressure_bar','bar'], ['oilPressure_bar','bar'],
+  ['fuelPressure_kpa','kPa'], ['oilPressure_kpa','kPa'], ['loopsPerRev',''],
+  ['boostCutOut',''], ['flood',''], ['batWarn',''],
+];
+
+const SCALAR_BY_NAME = Object.fromEntries(SCALARS.map(s => [s[0], s]));
+const BIT_BY_NAME = Object.fromEntries(BITS.map(b => [b[0], b]));
+
+// Lista única de todos os canais, na ordem usada no histórico e no datalog
+const ALL = [
+  ...SCALARS.map(s => ({ name: s[0], units: s[3], off: s[2], dec: decFor(s[4], s[3]) })),
+  ...BITS.map(b => ({ name: b[0], units: '', off: b[1], dec: 0, bit: true })),
+  ...DERIVED.map(d => ({ name: d[0], units: d[1], off: null, dec: 2 })),
+];
+ALL.find(c => c.name === 'coolant').dec = 0;
+ALL.find(c => c.name === 'iat').dec = 0;
+ALL.find(c => c.name === 'fuelTemp').dec = 0;
+ALL.find(c => c.name === 'throttle').dec = 1;
+ALL.find(c => c.name === 'dutyCycle').dec = 1;
+ALL.find(c => c.name === 'stgDutyCycle').dec = 1;
+['boostCutOut','flood','batWarn','MAPxRPM'].forEach(n => ALL.find(c => c.name === n).dec = 0);
+const IDX = Object.fromEntries(ALL.map((c, i) => [c.name, i]));
+
+function decFor(scale) { return scale >= 1 ? 0 : scale >= 0.1 ? 1 : 3; }
+function unitsOf(name) {
+  const u = ALL[IDX[name]].units;
+  return u === 'TEMP' ? (S.tempUnit === 'F' ? '°F' : '°C') : u;
+}
+
+/* ========================= Configurações ========================= */
+const DEFAULT_SETTINGS = {
+  tempUnit: 'C', stoich: 14.7, twoStroke: false,
+  rpmMax: 8000, rpmWarn: 6500, rpmDang: 7000,
+  mapMax: 250, mapWarn: 200, mapDang: 230,
+  batLow: 11.0, batHigh: 15.5, tpsFlood: 90, crankRpm: 400,
+  onlyActive: false,
+  chart: { chs: ['rpm', 'map', 'afr', 'advance'], win: 30 },
+};
+const DEFAULT_LAYOUT = {
+  main: [
+    { g: 'tachometer', s: 'analog' }, { g: 'throttleGauge', s: 'analog' },
+    { g: 'pulseWidthGauge', s: 'analog' }, { g: 'dutyCycleGauge', s: 'analog' },
+    { g: 'mapGauge', s: 'analog' }, { g: 'iatGauge', s: 'analog' },
+    { g: 'cltGauge', s: 'analog' }, { g: 'gammaEnrichGauge', s: 'analog' },
+  ],
+  sec: [
+    { g: 'afrGauge', s: 'bar' }, { g: 'afrTargetGauge', s: 'bar' },
+    { g: 'advanceGauge', s: 'bar' }, { g: 'lambdaGauge', s: 'bar' },
+    { g: 'batteryVoltage', s: 'digital' }, { g: 'veGauge', s: 'digital' },
+    { g: 'dwellGauge', s: 'digital' }, { g: 'egoCorrGauge', s: 'digital' },
+    { g: 'warmupEnrichGauge', s: 'digital' }, { g: 'accelEnrichGauge', s: 'digital' },
+    { g: 'baroGauge', s: 'digital' }, { g: 'syncLossGauge', s: 'digital' },
+  ],
+};
+
+function load(key, def) {
+  try {
+    const v = JSON.parse(localStorage.getItem(key));
+    if (v && typeof v === 'object') return Object.assign(structuredClone(def), v);
+  } catch (e) {}
+  return structuredClone(def);
+}
+function save(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) {} }
+
+let S = load('sdl.settings', DEFAULT_SETTINGS);
+let LAYOUT = load('sdl.layout', DEFAULT_LAYOUT);
+
+/* ========================= Decodificação ========================= */
+function readRaw(dv, type, off) {
+  switch (type) {
+    case 'U08': return dv.getUint8(off);
+    case 'S08': return dv.getInt8(off);
+    case 'U16': return dv.getUint16(off, true);
+    case 'S16': return dv.getInt16(off, true);
+  }
+  return 0;
+}
+
+function decode(dv) {
+  const v = {};
+  for (const [name, type, off, , scale] of SCALARS) v[name] = readRaw(dv, type, off) * scale;
+  for (const [name, off, lo, hi] of BITS) v[name] = (dv.getUint8(off) >> lo) & ((1 << (hi - lo + 1)) - 1);
+
+  const toT = c => S.tempUnit === 'F' ? c * 1.8 + 32 : c;
+  v.coolant = toT(v.coolantRaw - 40);
+  v.iat = toT(v.iatRaw - 40);
+  v.fuelTemp = toT(v.fuelTempRaw - 40);
+  v.throttle = v.tps;
+  v.lambda = v.afr / S.stoich;
+  v.lambdaTarget = v.afrTarget / S.stoich;
+  const revTime = v.rpm ? 60000 / v.rpm : 0;
+  const cycleTime = revTime * (S.twoStroke ? 1 : 2);
+  const pulseLimit = v.nSquirts ? cycleTime / v.nSquirts : cycleTime;
+  v.dutyCycle = v.rpm && pulseLimit ? 100 * v.pulseWidth / pulseLimit : 0;
+  v.stgDutyCycle = v.rpm && pulseLimit ? 100 * v.pulseWidth3 / pulseLimit : 0;
+  v.map_bar = (v.map - v.baro) / 101.33;
+  v.map_psi = (v.map - v.baro) * 0.145038;
+  const inhg = (v.baro - v.map) * 0.2953007;
+  v.map_vacboost = v.map < v.baro ? -inhg : v.map_psi;
+  v.MAPxRPM = v.rpm * v.map;
+  v.vssMPH = v.vss / 1.60934;
+  v.fuelPressure_bar = v.fuelPressure * 0.06894757;
+  v.oilPressure_bar = v.oilPressure * 0.06894757;
+  v.fuelPressure_kpa = v.fuelPressure * 6.894757;
+  v.oilPressure_kpa = v.oilPressure * 6.894757;
+  v.loopsPerRev = v.rpm ? v.loopsPerSecond / (v.rpm / 60) : 0;
+  v.boostCutOut = (v.boostCutFuel || v.boostCutSpark) ? 1 : 0;
+  v.flood = (v.tps > S.tpsFlood && v.rpm < S.crankRpm) ? 1 : 0;
+  v.batWarn = (v.batteryVoltage < S.batLow || v.batteryVoltage > S.batHigh) ? 1 : 0;
+  return v;
+}
+
+function toRow(v) {
+  const row = new Float32Array(ALL.length);
+  for (let i = 0; i < ALL.length; i++) row[i] = v[ALL[i].name];
+  return row;
+}
+
+/* ========================= Catálogo de mostradores =========================
+   Baseado em [GaugeConfigurations] do .ini:
+   canal, título, unidade, mín, máx, perigo baixo, alerta baixo, alerta alto, perigo alto, casas decimais */
+const CATEGORIES = ['Principais', 'Sensores', 'Combustível', 'Ignição', 'Correções', 'Marcha lenta / VVT / Boost', 'Entradas auxiliares', 'Sistema'];
+let GAUGES = {};
+
+function buildGauges() {
+  const st = S.stoich;
+  const F = S.tempUnit === 'F';
+  const tz = F ? [-40, 248, 0, 30, 200, 220] : [-40, 120, -15, 0, 95, 105];
+  const afrZ = [7, 25, 12 / 14.7 * st, 13 / 14.7 * st, 15 / 14.7 * st, 16 / 14.7 * st];
+  const G = {};
+  const add = (key, cat, ch, title, units, min, max, lo2, lo1, hi1, hi2, dec) =>
+    G[key] = { key, cat, ch, title, units, min, max, lo2, lo1, hi1, hi2, dec };
+
+  add('tachometer', 0, 'rpm', 'Rotação', 'RPM', 0, S.rpmMax, 300, 600, S.rpmWarn, S.rpmDang, 0);
+  add('throttleGauge', 0, 'throttle', 'Borboleta (TPS)', '%', 0, 100, -1, -1, 90, 100, 1);
+  add('mapGauge', 0, 'map', 'Pressão do coletor', 'kPa', 0, S.mapMax, 0, 20, S.mapWarn, S.mapDang, 0);
+  add('cltGauge', 0, 'coolant', 'Temp. do motor', 'TEMP', ...tz, 0);
+  add('iatGauge', 0, 'iat', 'Temp. do ar', 'TEMP', tz[0], tz[1], tz[2], tz[3], tz[4], tz[5] - 5, 0);
+  add('afrGauge', 0, 'afr', 'Mistura (AFR)', 'AFR', ...afrZ, 2);
+  add('lambdaGauge', 0, 'lambda', 'Lambda', 'λ', 0.5, 1.5, 0.7, 0.8, 1.1, 1.2, 2);
+  add('advanceGauge', 0, 'advance', 'Avanço', '°', -10, 50, -999, -999, 35, 45, 0);
+  add('batteryVoltage', 0, 'batteryVoltage', 'Bateria', 'V', 6, 18, 8, 9, 15, 16, 1);
+
+  add('afrGauge2', 1, 'afr2', 'Mistura 2 (AFR)', 'AFR', ...afrZ, 2);
+  add('mapPsiGauge', 1, 'map_psi', 'MAP (PSI)', 'PSI', -15, 30, -99, -99, 20, 25, 1);
+  add('mapBarGauge', 1, 'map_bar', 'MAP (bar)', 'bar', -1, 3, -9, -9, 2, 2.5, 2);
+  add('vacBoostGauge', 1, 'map_vacboost', 'Vácuo / Boost', 'inHg/PSI', -30, 30, -99, -99, 20, 25, 1);
+  add('emapGauge', 1, 'emap', 'Pressão de escape', 'kPa', 0, S.mapMax, 0, 20, S.mapWarn, S.mapDang, 0);
+  add('baroGauge', 1, 'baro', 'Pressão barométrica', 'kPa', 0, 120, -1, -1, 999, 999, 0);
+  add('vssGauge', 1, 'vss', 'Velocidade', 'km/h', 0, 250, -1, -1, 180, 200, 0);
+  add('vssMphGauge', 1, 'vssMPH', 'Velocidade (mph)', 'mph', 0, 160, -1, -1, 120, 140, 0);
+  add('gearGauge', 1, 'gear', 'Marcha', '', 0, 6, -1, -1, 99, 99, 0);
+  add('tpsADCGauge', 1, 'tpsADC', 'TPS (ADC)', '', 0, 255, -1, -1, 256, 256, 0);
+  add('TPSdotGauge', 1, 'TPSdot', 'TPS DOT', '%/s', -1000, 1000, -9999, -9999, 9999, 9999, 0);
+  add('MAPdotGauge', 1, 'MAPdot', 'MAP DOT', 'kPa/s', -1000, 1000, -9999, -9999, 9999, 9999, 0);
+  add('rpmDotGauge', 1, 'rpmDOT', 'RPM DOT', 'rpm/s', -5000, 5000, -99999, -99999, 99999, 99999, 0);
+  add('fuelTempGauge', 1, 'fuelTemp', 'Temp. do combustível', 'TEMP', tz[0], tz[1], tz[2], tz[3], tz[4], tz[5] - 5, 0);
+  add('flexGauge', 1, 'flex', 'Sensor flex (etanol)', '%', 0, 100, -1, -1, 999, 999, 0);
+  add('fuelPressureGauge', 1, 'fuelPressure', 'Pressão de combustível', 'PSI', 0, 100, 0, 20, 200, 245, 0);
+  add('oilPressureGauge', 1, 'oilPressure', 'Pressão de óleo', 'PSI', 0, 100, 0, 20, 200, 245, 0);
+  add('fuelPressureBarGauge', 1, 'fuelPressure_bar', 'Pressão de combustível', 'bar', 0, 7, 0.5, 1.4, 14, 17, 1);
+  add('oilPressureBarGauge', 1, 'oilPressure_bar', 'Pressão de óleo', 'bar', 0, 7, 0.5, 1.4, 14, 17, 1);
+
+  add('pulseWidthGauge', 2, 'pulseWidth', 'Tempo de injeção', 'ms', 0, 35, 1.0, 1.2, 20, 25, 2);
+  add('pulseWidthGauge2', 2, 'pulseWidth2', 'Tempo de injeção 2', 'ms', 0, 35, 1.0, 1.2, 20, 25, 2);
+  add('pulseWidthGauge3', 2, 'pulseWidth3', 'Tempo de injeção 3', 'ms', 0, 35, 1.0, 1.2, 20, 25, 2);
+  add('pulseWidthGauge4', 2, 'pulseWidth4', 'Tempo de injeção 4', 'ms', 0, 35, 1.0, 1.2, 20, 25, 2);
+  add('dutyCycleGauge', 2, 'dutyCycle', 'Duty cycle injetor', '%', 0, 100, -1, -1, 70, 80, 1);
+  add('stgDutyCycleGauge', 2, 'stgDutyCycle', 'Duty cycle staging', '%', 0, 100, -1, -1, 70, 80, 1);
+  add('veGauge', 2, 'veCurr', 'VE atual', '%', 0, 120, -1, -1, 999, 999, 0);
+  add('ve1Gauge', 2, 'VE1', 'VE1 (tabela 1)', '%', 0, 120, -1, -1, 999, 999, 0);
+  add('ve2Gauge', 2, 'VE2', 'VE2 (tabela 2)', '%', 0, 120, -1, -1, 999, 999, 0);
+  add('afrTargetGauge', 2, 'afrTarget', 'AFR alvo', 'AFR', ...afrZ, 2);
+  add('lambdaTargetGauge', 2, 'lambdaTarget', 'Lambda alvo', 'λ', 0.5, 1.5, 0.82, 0.89, 1.02, 1.09, 2);
+  add('gammaEnrichGauge', 2, 'gammaEnrich', 'Enriquecimento total', '%', 50, 250, -1, -1, 151, 151, 0);
+  add('fuelLoadGauge', 2, 'fuelLoad', 'Carga (combustível)', '', 0, 255, -1, -1, 999, 999, 0);
+  add('wmiGauge', 2, 'wmiPW', 'Duty cycle WMI', '%', 0, 100, -1, -1, 101, 110, 0);
+
+  add('advance1Gauge', 3, 'advance1', 'Avanço (tabela 1)', '°', -10, 50, -999, -999, 35, 45, 0);
+  add('advance2Gauge', 3, 'advance2', 'Avanço (tabela 2)', '°', -10, 50, -999, -999, 35, 45, 0);
+  add('dwellGauge', 3, 'dwell', 'Dwell (pedido)', 'ms', 0, 10, -1, -1, 6, 8, 2);
+  add('dwellActualGauge', 3, 'dwellActual', 'Dwell (medido)', 'ms', 0, 10, -1, -1, 6, 8, 2);
+  add('ignLoadGauge', 3, 'ignLoad', 'Carga (ignição)', '', 0, 255, -1, -1, 999, 999, 0);
+  add('knockCorGauge', 3, 'knockCor', 'Correção de knock', '°', 0, 20, -1, -1, 5, 10, 0);
+  add('knockCountGauge', 3, 'knockEventCount', 'Eventos de knock', '', 0, 255, -1, -1, 1, 10, 0);
+  add('flexIgnGauge', 3, 'flexIgnCor', 'Correção ign. flex', '°', -10, 20, -99, -99, 99, 99, 0);
+
+  add('egoCorrGauge', 4, 'egoCorrection', 'Correção EGO (sonda)', '%', 50, 150, 90, 99, 101, 110, 0);
+  add('warmupEnrichGauge', 4, 'warmupEnrich', 'Enriq. aquecimento', '%', 100, 200, -1, -1, 140, 150, 0);
+  add('aseEnrichGauge', 4, 'ASECurr', 'Enriq. pós-partida', '%', 0, 200, -1, -1, 140, 150, 0);
+  add('accelEnrichGauge', 4, 'accelEnrich', 'Enriq. aceleração', '%', 50, 150, -1, -1, 999, 999, 0);
+  add('batCorrectGauge', 4, 'batCorrection', 'Correção bateria', '%', 0, 200, -1, -1, 140, 150, 0);
+  add('iatCorrectGauge', 4, 'airCorrection', 'Correção temp. ar', '%', 0, 200, -1, -1, 140, 150, 0);
+  add('baroCorrectGauge', 4, 'baroCorrection', 'Correção barométrica', '%', 0, 200, -1, -1, 140, 150, 0);
+  add('flexEnrich', 4, 'flexFuelCor', 'Correção flex', '%', 0, 200, -1, -1, 140, 150, 0);
+  add('fuelTempCorGauge', 4, 'fuelTempCor', 'Correção temp. comb.', '%', 0, 200, -1, -1, 140, 150, 0);
+
+  add('IdleTargetGauge', 5, 'CLIdleTarget', 'Marcha lenta alvo', 'RPM', 0, 2000, 300, 600, 1500, 1700, 0);
+  add('idleLoadGauge', 5, 'idleLoad', 'Atuador de marcha lenta', '', 0, 255, -1, -1, 999, 999, 0);
+  add('boostTargetGauge', 5, 'boostTarget', 'Boost alvo', 'kPa', 0, S.mapMax, 0, 20, S.mapWarn, S.mapDang, 0);
+  add('boostDutyGauge', 5, 'boostDuty', 'Duty cycle boost', '%', 0, 100, -1, -1, 101, 110, 0);
+  add('fanDutyGauge', 5, 'fanDuty', 'Duty cycle ventoinha', '%', 0, 100, -1, -1, 101, 110, 0);
+  add('vvt1AngleGauge', 5, 'vvt1Angle', 'Ângulo VVT1', '°', -20, 100, -999, -999, 70, 90, 1);
+  add('vvt1TargetGauge', 5, 'vvt1Target', 'VVT1 alvo', '°', 0, 100, -999, -999, 65, 75, 1);
+  add('vvt1DutyGauge', 5, 'vvt1Duty', 'Duty cycle VVT1', '%', 0, 100, -1, -1, 101, 110, 1);
+  add('vvt2AngleGauge', 5, 'vvt2Angle', 'Ângulo VVT2', '°', -20, 100, -999, -999, 70, 90, 1);
+  add('vvt2TargetGauge', 5, 'vvt2Target', 'VVT2 alvo', '°', 0, 100, -999, -999, 65, 75, 1);
+  add('vvt2DutyGauge', 5, 'vvt2Duty', 'Duty cycle VVT2', '%', 0, 100, -1, -1, 101, 110, 1);
+
+  for (let i = 0; i < 16; i++)
+    add('auxin' + i, 6, 'auxin_gauge' + i, 'Entrada auxiliar ' + i, '', 0, 1023, -1, -1, 99999, 99999, 0);
+
+  add('syncLossGauge', 7, 'syncLossCounter', 'Perdas de sincronismo', '', 0, 255, -1, -1, 1, 10, 0);
+  add('loopsGauge', 7, 'loopsPerSecond', 'Loops por segundo', 'loops', 0, 5000, -1, -1, 99999, 99999, 0);
+  add('loopsRevGauge', 7, 'loopsPerRev', 'Loops por rotação', '', 0, 300, -1, -1, 99999, 99999, 0);
+  add('freeRamGauge', 7, 'freeRAM', 'RAM livre', 'bytes', 0, 8192, 200, 500, 99999, 99999, 0);
+  add('seclGauge', 7, 'secl', 'Contador de segundos', 's', 0, 255, -1, -1, 999, 999, 0);
+
+  for (const g of Object.values(G)) if (g.units === 'TEMP') g.units = F ? '°F' : '°C';
+  GAUGES = G;
+}
+
+function zoneOf(d, v) {
+  if (v < d.lo2) return 2;
+  if (v < d.lo1) return 1;
+  if (v > d.hi2) return 2;
+  if (v > d.hi1) return 1;
+  return 0;
+}
+const ZONE_TEXT = ['#f2f4f7', '#ffd60a', '#ff453a'];
+const RED = '#e5332a', YEL = '#e8c300';
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const TAU = Math.PI * 2;
+
+function fmt(v, dec) {
+  if (v == null || !isFinite(v)) return '—';
+  return v.toFixed(dec);
+}
+function niceStep(range, target) {
+  const raw = range / target;
+  const p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / p;
+  return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * p;
+}
+function fitFont(c, text, weight, size, maxW, family) {
+  let s = size;
+  c.font = `${weight} ${s}px ${family}`;
+  const w = c.measureText(text).width;
+  if (w > maxW) { s = s * maxW / w; c.font = `${weight} ${s}px ${family}`; }
+  return s;
+}
+const SANS = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+const MONO = 'ui-monospace,Consolas,"DejaVu Sans Mono",monospace';
+
+/* ========================= Mostradores (canvas) ========================= */
+class Gauge {
+  constructor(el) {
+    this.el = el;
+    this.cv = document.createElement('canvas');
+    this.ctx = this.cv.getContext('2d');
+    this.face = document.createElement('canvas');
+    el.appendChild(this.cv);
+    this.w = this.h = this.dpr = 0;
+    this.shown = null;
+    this.lastKey = '';
+    this.faceDirty = true;
+  }
+  set(def, style) {
+    this.def = def; this.style = style;
+    this.faceDirty = true; this.shown = null; this.lastKey = '';
+  }
+  resize() {
+    const r = this.el.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(20, Math.round(r.width)), h = Math.max(20, Math.round(r.height));
+    if (w !== this.w || h !== this.h || dpr !== this.dpr) {
+      this.w = w; this.h = h; this.dpr = dpr;
+      this.cv.width = this.face.width = Math.round(w * dpr);
+      this.cv.height = this.face.height = Math.round(h * dpr);
+      this.faceDirty = true; this.lastKey = '';
+    }
+  }
+  update(value) {
+    const d = this.def;
+    if (!d || !this.w) return;
+    if (this.faceDirty) { this.drawFace(); this.faceDirty = false; this.lastKey = ''; }
+    const v = (value == null || !isFinite(value)) ? null : value;
+    const target = v == null ? d.min : v;
+    if (this.shown == null) this.shown = target;
+    else {
+      this.shown += (target - this.shown) * 0.35;
+      if (Math.abs(target - this.shown) < (d.max - d.min) * 0.0008) this.shown = target;
+    }
+    const key = this.shown.toFixed(4) + '|' + fmt(v, d.dec);
+    if (key === this.lastKey) return;
+    this.lastKey = key;
+    const c = this.ctx;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, this.cv.width, this.cv.height);
+    c.drawImage(this.face, 0, 0);
+    c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    if (this.style === 'analog') this.drawAnalog(c, v);
+    else if (this.style === 'bar') this.drawBar(c, v);
+    else this.drawDigital(c, v);
+  }
+
+  drawFace() {
+    const c = this.face.getContext('2d');
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, this.face.width, this.face.height);
+    c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    if (this.style === 'analog') this.faceAnalog(c);
+    else if (this.style === 'bar') this.faceBar(c);
+    else this.faceDigital(c);
+  }
+
+  // ---- Analógico ----
+  geom() {
+    const R = Math.min(this.w, this.h) * 0.47;
+    return { R, cx: this.w / 2, cy: this.h / 2 + R * 0.03, A0: Math.PI * 0.75, A1: Math.PI * 2.25 };
+  }
+  ang(v) {
+    const d = this.def, g = this.geom();
+    return g.A0 + clamp((v - d.min) / (d.max - d.min), 0, 1) * (g.A1 - g.A0);
+  }
+  faceAnalog(c) {
+    const d = this.def, { R, cx, cy } = this.geom();
+    let gr = c.createLinearGradient(0, cy - R, 0, cy + R);
+    gr.addColorStop(0, '#6a707a'); gr.addColorStop(0.5, '#2a2d33'); gr.addColorStop(1, '#15171a');
+    c.beginPath(); c.arc(cx, cy, R, 0, TAU); c.fillStyle = gr; c.fill();
+    gr = c.createRadialGradient(cx, cy - R * 0.35, R * 0.05, cx, cy, R * 0.95);
+    gr.addColorStop(0, '#2b2f37'); gr.addColorStop(1, '#060708');
+    c.beginPath(); c.arc(cx, cy, R * 0.94, 0, TAU); c.fillStyle = gr; c.fill();
+
+    const zr = R * 0.80, zw = R * 0.075;
+    const zone = (a, b, col) => {
+      a = clamp(a, d.min, d.max); b = clamp(b, d.min, d.max);
+      if (b <= a) return;
+      c.beginPath(); c.arc(cx, cy, zr, this.ang(a), this.ang(b));
+      c.strokeStyle = col; c.lineWidth = zw; c.lineCap = 'butt'; c.stroke();
+    };
+    zone(d.min, d.lo2, RED);
+    zone(Math.max(d.min, d.lo2), d.lo1, YEL);
+    zone(d.hi1, Math.min(d.max, d.hi2), YEL);
+    zone(d.hi2, d.max, RED);
+
+    const span = d.max - d.min;
+    const step = niceStep(span, 8), minor = step / 5;
+    const div = Math.max(Math.abs(d.max), Math.abs(d.min)) >= 2000 ? 1000 : 1;
+    const n0 = Math.ceil(d.min / minor - 1e-9), n1 = Math.floor(d.max / minor + 1e-9);
+    c.strokeStyle = '#e8eaed'; c.fillStyle = '#e8eaed';
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = `600 ${R * 0.115}px ${SANS}`;
+    for (let i = n0; i <= n1; i++) {
+      const v = i * minor;
+      const major = ((i % 5) + 5) % 5 === 0;
+      const a = this.ang(v), ca = Math.cos(a), sa = Math.sin(a);
+      const r1 = R * 0.9, r2 = major ? R * 0.74 : R * 0.84;
+      c.beginPath(); c.moveTo(cx + ca * r1, cy + sa * r1); c.lineTo(cx + ca * r2, cy + sa * r2);
+      c.lineWidth = major ? R * 0.022 : R * 0.01; c.stroke();
+      if (major) {
+        const lv = +(v / div).toFixed(3);
+        c.fillText(String(lv), cx + ca * R * 0.6, cy + sa * R * 0.6);
+      }
+    }
+    // título no vão inferior do mostrador, unidade logo acima do valor
+    c.fillStyle = '#c9cdd4';
+    fitFont(c, d.title, 600, R * 0.1, R * 0.95, SANS);
+    c.fillText(d.title, cx, cy + R * 0.8);
+    c.fillStyle = '#8b919c';
+    c.font = `500 ${R * 0.085}px ${SANS}`;
+    c.fillText(d.units + (div > 1 ? '  ×1000' : ''), cx, cy + R * 0.3);
+  }
+  drawAnalog(c, v) {
+    const d = this.def, { R, cx, cy } = this.geom();
+    // valor digital
+    const bw = R * 0.78, bh = R * 0.25, by = cy + R * 0.4;
+    c.fillStyle = '#000'; c.strokeStyle = '#2f343c'; c.lineWidth = 1;
+    c.beginPath(); c.roundRect(cx - bw / 2, by, bw, bh, R * 0.04); c.fill(); c.stroke();
+    c.fillStyle = v == null ? '#5b616c' : ZONE_TEXT[zoneOf(d, v)];
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    const txt = fmt(v, d.dec);
+    fitFont(c, txt, 700, R * 0.19, bw * 0.9, MONO);
+    c.fillText(txt, cx, by + bh / 2 + 1);
+    // ponteiro
+    c.save();
+    c.translate(cx, cy); c.rotate(this.ang(this.shown));
+    c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = R * 0.05; c.shadowOffsetY = R * 0.015;
+    c.beginPath();
+    c.moveTo(-R * 0.15, -R * 0.032); c.lineTo(R * 0.86, -R * 0.009);
+    c.lineTo(R * 0.86, R * 0.009); c.lineTo(-R * 0.15, R * 0.032); c.closePath();
+    c.fillStyle = '#ff3b2f'; c.fill();
+    c.restore();
+    const gr = c.createRadialGradient(cx - R * 0.02, cy - R * 0.02, 0, cx, cy, R * 0.08);
+    gr.addColorStop(0, '#777'); gr.addColorStop(1, '#111');
+    c.beginPath(); c.arc(cx, cy, R * 0.075, 0, TAU); c.fillStyle = gr; c.fill();
+  }
+
+  // ---- Barra ----
+  barGeom() {
+    const pad = Math.max(8, this.w * 0.04);
+    const bh = clamp(this.h * 0.16, 8, 22);
+    return { pad, x: pad, y: this.h - pad - bh - 14, bw: this.w - pad * 2, bh };
+  }
+  bx(v) {
+    const d = this.def, g = this.barGeom();
+    return g.x + clamp((v - d.min) / (d.max - d.min), 0, 1) * g.bw;
+  }
+  faceBar(c) {
+    const d = this.def, g = this.barGeom();
+    c.fillStyle = '#c9cdd4'; c.textAlign = 'left'; c.textBaseline = 'top';
+    fitFont(c, d.title, 600, clamp(this.h * 0.16, 11, 15), this.w * 0.55, SANS);
+    c.fillText(d.title, g.pad, g.pad - 2);
+    c.fillStyle = '#8b919c'; c.font = `500 ${clamp(this.h * 0.13, 10, 13)}px ${SANS}`;
+    c.fillText(d.units, g.pad, g.pad + clamp(this.h * 0.18, 13, 18));
+    c.fillStyle = '#1a1d22';
+    c.beginPath(); c.roundRect(g.x, g.y, g.bw, g.bh, 3); c.fill();
+    const seg = (a, b, col) => {
+      a = clamp(a, d.min, d.max); b = clamp(b, d.min, d.max);
+      if (b <= a) return;
+      c.fillStyle = col; c.fillRect(this.bx(a), g.y + g.bh - 3, this.bx(b) - this.bx(a), 3);
+    };
+    seg(d.min, d.lo2, RED); seg(Math.max(d.min, d.lo2), d.lo1, YEL);
+    seg(d.hi1, Math.min(d.max, d.hi2), YEL); seg(d.hi2, d.max, RED);
+    c.fillStyle = '#6f7682'; c.font = `500 10px ${SANS}`; c.textBaseline = 'top';
+    c.textAlign = 'left'; c.fillText(String(+d.min.toFixed(2)), g.x, g.y + g.bh + 3);
+    c.textAlign = 'right'; c.fillText(String(+d.max.toFixed(2)), g.x + g.bw, g.y + g.bh + 3);
+  }
+  drawBar(c, v) {
+    const d = this.def, g = this.barGeom();
+    const z = v == null ? 0 : zoneOf(d, v);
+    const base = (d.min < 0 && d.max > 0) ? 0 : d.min;
+    const x0 = this.bx(base), x1 = this.bx(this.shown);
+    c.fillStyle = z === 2 ? '#e5332a' : z === 1 ? '#e8c300' : '#3fa9f5';
+    c.fillRect(Math.min(x0, x1), g.y, Math.abs(x1 - x0), g.bh - 3);
+    c.fillStyle = v == null ? '#5b616c' : ZONE_TEXT[z];
+    c.textAlign = 'right'; c.textBaseline = 'top';
+    const txt = fmt(v, d.dec);
+    fitFont(c, txt, 700, clamp(this.h * 0.34, 16, 34), this.w * 0.42, MONO);
+    c.fillText(txt, this.w - g.pad, g.pad - 4);
+  }
+
+  // ---- Digital ----
+  faceDigital(c) {
+    const d = this.def, pad = Math.max(8, this.w * 0.04);
+    c.fillStyle = '#c9cdd4'; c.textAlign = 'left'; c.textBaseline = 'top';
+    fitFont(c, d.title, 600, clamp(this.h * 0.16, 11, 15), this.w - pad * 2, SANS);
+    c.fillText(d.title, pad, pad - 2);
+    c.fillStyle = '#8b919c'; c.textAlign = 'right'; c.textBaseline = 'bottom';
+    c.font = `500 ${clamp(this.h * 0.14, 10, 14)}px ${SANS}`;
+    c.fillText(d.units, this.w - pad, this.h - pad + 2);
+  }
+  drawDigital(c, v) {
+    const d = this.def, pad = Math.max(8, this.w * 0.04);
+    c.fillStyle = v == null ? '#5b616c' : ZONE_TEXT[zoneOf(d, v)];
+    c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+    const txt = fmt(v, d.dec);
+    fitFont(c, txt, 700, clamp(this.h * 0.46, 18, 64), this.w * 0.72, MONO);
+    c.fillText(txt, pad, this.h - pad);
+  }
+}
+
+/* ========================= Painel ========================= */
+const gauges = { main: [], sec: [] };
+
+function buildDash() {
+  for (const group of ['main', 'sec']) {
+    const grid = document.getElementById(group === 'main' ? 'gridMain' : 'gridSec');
+    grid.innerHTML = '';
+    gauges[group] = LAYOUT[group].map((slot, i) => {
+      const el = document.createElement('div');
+      el.className = 'slot';
+      el.addEventListener('click', () => openGaugeDialog(group, i));
+      grid.appendChild(el);
+      const g = new Gauge(el);
+      g.set(GAUGES[slot.g] || Object.values(GAUGES)[0], slot.s);
+      return g;
+    });
+  }
+  resizeAll();
+}
+function applyLayoutDefs() {
+  for (const group of ['main', 'sec'])
+    gauges[group].forEach((g, i) => g.set(GAUGES[LAYOUT[group][i].g] || Object.values(GAUGES)[0], LAYOUT[group][i].s));
+}
+function resizeAll() {
+  for (const g of [...gauges.main, ...gauges.sec]) g.resize();
+}
+new ResizeObserver(() => { resizeAll(); resizeChart(); }).observe(document.body);
+
+let dlgTarget = null;
+function openGaugeDialog(group, i) {
+  dlgTarget = { group, i };
+  const sel = document.getElementById('gaugeSel');
+  sel.innerHTML = '';
+  CATEGORIES.forEach((cat, ci) => {
+    const og = document.createElement('optgroup');
+    og.label = cat;
+    for (const g of Object.values(GAUGES)) {
+      if (g.cat !== ci) continue;
+      const o = document.createElement('option');
+      o.value = g.key; o.textContent = `${g.title}${g.units ? ' (' + g.units + ')' : ''}`;
+      og.appendChild(o);
+    }
+    sel.appendChild(og);
+  });
+  sel.value = LAYOUT[group][i].g;
+  document.getElementById('gaugeStyle').value = LAYOUT[group][i].s;
+  document.getElementById('dlgGauge').showModal();
+}
+document.getElementById('dlgGauge').addEventListener('close', e => {
+  if (e.target.returnValue !== 'ok' || !dlgTarget) return;
+  const { group, i } = dlgTarget;
+  LAYOUT[group][i] = { g: document.getElementById('gaugeSel').value, s: document.getElementById('gaugeStyle').value };
+  save('sdl.layout', LAYOUT);
+  gauges[group][i].set(GAUGES[LAYOUT[group][i].g], LAYOUT[group][i].s);
+});
+
+/* ========================= Indicadores ========================= */
+// canal, texto desligado, texto ligado, cor quando ligado (mesma lista do [FrontPage] do .ini)
+const INDICATORS = [
+  ['running', 'Motor parado', 'Funcionando', 'green'],
+  ['crank', 'Sem partida', 'Dando partida', 'green'],
+  ['ase', 'ASE desl.', 'ASE (pós-partida)', 'green'],
+  ['warmup', 'WUE desl.', 'WUE (aquecimento)', 'green'],
+  ['tpsaccaen', 'Acel. TPS', 'Acel. TPS', 'green'],
+  ['tpsaccden', 'Desacel. TPS', 'Desacel. TPS', 'green'],
+  ['mapaccaen', 'Acel. MAP', 'Acel. MAP', 'green'],
+  ['mapaccden', 'Desacel. MAP', 'Desacel. MAP', 'green'],
+  ['error', 'Sem erros', 'ERRO', 'red'],
+  ['flood', 'Flood clear desl.', 'FLOOD CLEAR', 'red'],
+  ['DFCOOn', 'DFCO desl.', 'DFCO (corte desacel.)', 'red'],
+  ['launchHard', 'Launch forte', 'Launch forte', 'green'],
+  ['launchSoft', 'Launch suave', 'Launch suave', 'green'],
+  ['softlimitOn', 'Limitador suave desl.', 'Limitador suave', 'red'],
+  ['hardLimitOn', 'Limitador forte desl.', 'Limitador forte', 'red'],
+  ['boostCutOut', 'Corte por boost desl.', 'Corte por boost', 'red'],
+  ['sync', 'Sem sincronismo', 'Sincronismo total', 'green'],
+  ['halfSync', 'Meio sincronismo', 'Meio sincronismo', 'yellow'],
+  ['resetLockOn', 'Reset lock desl.', 'Reset lock', 'green'],
+  ['nitrousOn', 'Nitro desl.', 'Nitro ligado', 'red'],
+  ['IOError', 'E/S OK', 'Erro de E/S', 'red'],
+  ['burnPending', 'Gravação EEPROM', 'Gravação EEPROM pendente', 'red'],
+  ['stagingActive', 'Staging desl.', 'Staging ativo', 'green'],
+  ['fuel2Active', 'Tabela comb. 2', 'Tabela comb. 2 ativa', 'green'],
+  ['spark2Active', 'Tabela ign. 2', 'Tabela ign. 2 ativa', 'green'],
+  ['engineProtectStatus', 'Proteção do motor desl.', 'Proteção do motor', 'red'],
+  ['engineProtectRPM', 'Corte por RPM desl.', 'Corte por RPM', 'red'],
+  ['engineProtectMAP', 'Limite de boost desl.', 'Limite de boost', 'red'],
+  ['engineProtectOil', 'Proteção óleo desl.', 'Proteção pressão de óleo', 'red'],
+  ['engineProtectAFR', 'Proteção AFR desl.', 'Proteção AFR', 'red'],
+  ['engineProtectCoolant', 'Proteção temp. desl.', 'Proteção temperatura', 'red'],
+  ['knockActive', 'Knock', 'Knock detectado', 'red'],
+  ['flatShiftHardActive', 'Flat shift', 'Flat shift ativo', 'green'],
+  ['wmiEmptyBit', 'Tanque WMI OK', 'Tanque WMI vazio', 'red'],
+  ['vvt1Error', 'VVT1 OK', 'Erro VVT1', 'red'],
+  ['vvt2Error', 'VVT2 OK', 'Erro VVT2', 'red'],
+  ['fanStatus', 'Ventoinha desl.', 'Ventoinha ligada', 'red'],
+  ['idleControlOn', 'Controle de lenta desl.', 'Controle de lenta', 'green'],
+  ['batWarn', 'Bateria OK', 'Alerta de tensão da bateria', 'red'],
+  ...Array.from({ length: 8 }, (_, i) => ['outputsStatus' + i, `Saída prog. ${i + 1}`, `Saída prog. ${i + 1} ligada`, 'green']),
+  ['airConRequest', 'Pedido A/C desl.', 'Pedido A/C', 'green'],
+  ['airConCompressor', 'Compressor A/C desl.', 'Compressor A/C', 'green'],
+  ['airConFanStatus', 'Ventoinha A/C desl.', 'Ventoinha A/C', 'green'],
+  [v => v.sd_status & 1, 'Sem cartão SD', 'SD presente', 'green'],
+  [v => v.sd_status & 4, 'SD pronto', 'SD pronto', 'green'],
+  [v => v.sd_status & 8, 'SD desl.', 'SD gravando', 'green'],
+  [v => v.sd_status & 16, 'SD OK', 'Erro no SD', 'red'],
+];
+const indEls = [];
+function buildIndicators() {
+  const box = document.getElementById('indicators');
+  box.innerHTML = '';
+  for (const ind of INDICATORS) {
+    const s = document.createElement('span');
+    s.textContent = ind[1];
+    box.appendChild(s);
+    indEls.push({ el: s, ind, state: null });
+  }
+  box.classList.toggle('only-active', S.onlyActive);
+  document.getElementById('onlyActive').checked = S.onlyActive;
+}
+function updateIndicators(v) {
+  for (const it of indEls) {
+    const [ch, off, on, col] = it.ind;
+    const st = !!(typeof ch === 'function' ? ch(v) : v[ch]);
+    if (st === it.state) continue;
+    it.state = st;
+    it.el.textContent = st ? on : off;
+    it.el.className = st ? 'on ' + col : '';
+  }
+}
+document.getElementById('onlyActive').addEventListener('change', e => {
+  S.onlyActive = e.target.checked; save('sdl.settings', S);
+  document.getElementById('indicators').classList.toggle('only-active', S.onlyActive);
+});
+
+/* ========================= Histórico e gráfico ========================= */
+const HIST_CAP = 8000;
+const hist = { t: new Float64Array(HIST_CAP), rows: new Array(HIST_CAP), head: 0, len: 0 };
+function histPush(t, row) {
+  hist.t[hist.head] = t; hist.rows[hist.head] = row;
+  hist.head = (hist.head + 1) % HIST_CAP;
+  if (hist.len < HIST_CAP) hist.len++;
+}
+
+const TRACE_COLORS = ['#ff5a4f', '#4fc3ff', '#ffd43b', '#69f07a'];
+const chart = { cv: document.getElementById('chartCv'), paused: false, pausedAt: 0, w: 0, h: 0, dpr: 1 };
+const PLOT_CHANNELS = ALL.filter(c => !c.bit && c.units !== 'bits').map(c => c.name);
+
+function buildChartBar() {
+  const bar = document.getElementById('chartBar');
+  bar.innerHTML = '';
+  S.chart.chs.forEach((ch, k) => {
+    const lab = document.createElement('label');
+    lab.className = 'trace';
+    lab.innerHTML = `<i style="background:${TRACE_COLORS[k]}"></i>`;
+    const sel = document.createElement('select');
+    for (const n of ['', ...PLOT_CHANNELS]) {
+      const o = document.createElement('option'); o.value = n; o.textContent = n || '(nenhum)'; sel.appendChild(o);
+    }
+    sel.value = ch;
+    sel.addEventListener('change', () => { S.chart.chs[k] = sel.value; save('sdl.settings', S); });
+    lab.appendChild(sel);
+    bar.appendChild(lab);
+  });
+  const sp = document.createElement('span'); sp.className = 'sep'; bar.appendChild(sp);
+  const win = document.createElement('select');
+  for (const s of [10, 30, 60, 120]) { const o = document.createElement('option'); o.value = s; o.textContent = s + ' s'; win.appendChild(o); }
+  win.value = S.chart.win;
+  win.addEventListener('change', () => { S.chart.win = +win.value; save('sdl.settings', S); });
+  bar.appendChild(win);
+  const pb = document.createElement('button');
+  pb.textContent = 'Pausar';
+  pb.addEventListener('click', () => {
+    chart.paused = !chart.paused;
+    chart.pausedAt = lastT;
+    pb.textContent = chart.paused ? 'Continuar' : 'Pausar';
+  });
+  bar.appendChild(pb);
+}
+function resizeChart() {
+  const r = chart.cv.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  if (!r.width) return;
+  chart.w = r.width; chart.h = r.height; chart.dpr = dpr;
+  chart.cv.width = Math.round(r.width * dpr); chart.cv.height = Math.round(r.height * dpr);
+}
+function defForChannel(ch) {
+  for (const g of Object.values(GAUGES)) if (g.ch === ch) return g;
+  return null;
+}
+function drawChart() {
+  const c = chart.cv.getContext('2d');
+  const { w, h, dpr } = chart;
+  if (!w) return;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.fillStyle = '#0b0c0e'; c.fillRect(0, 0, w, h);
+  const L = 10, Rr = 10, T = 44, B = 24;
+  const pw = w - L - Rr, ph = h - T - B;
+  const now = chart.paused ? chart.pausedAt : lastT;
+  const win = S.chart.win, t0 = now - win;
+
+  c.strokeStyle = '#1d2026'; c.lineWidth = 1;
+  c.fillStyle = '#5b616c'; c.font = `11px ${SANS}`; c.textAlign = 'center'; c.textBaseline = 'top';
+  for (let i = 0; i <= 4; i++) { const y = T + ph * i / 4; c.beginPath(); c.moveTo(L, y); c.lineTo(L + pw, y); c.stroke(); }
+  const tstep = win <= 10 ? 1 : win <= 30 ? 5 : win <= 60 ? 10 : 20;
+  for (let s = 0; s <= win; s += tstep) {
+    const x = L + pw - (s / win) * pw;
+    c.beginPath(); c.moveTo(x, T); c.lineTo(x, T + ph); c.stroke();
+    c.textAlign = s === 0 ? 'right' : s === win ? 'left' : 'center';
+    c.fillText(s ? `-${s}s` : 'agora', x, T + ph + 5);
+  }
+
+  // índices visíveis no buffer circular
+  const start = (hist.head - hist.len + HIST_CAP) % HIST_CAP;
+  const idxs = [];
+  for (let k = 0; k < hist.len; k++) {
+    const i = (start + k) % HIST_CAP;
+    const t = hist.t[i];
+    if (t >= t0 - 0.5 && t <= now) idxs.push(i);
+  }
+
+  let lx = L;
+  S.chart.chs.forEach((ch, k) => {
+    if (!ch || IDX[ch] == null) return;
+    const ci = IDX[ch];
+    const def = defForChannel(ch);
+    let mn, mx;
+    if (def) { mn = def.min; mx = def.max; }
+    else {
+      mn = Infinity; mx = -Infinity;
+      for (const i of idxs) { const y = hist.rows[i][ci]; if (y < mn) mn = y; if (y > mx) mx = y; }
+      if (!isFinite(mn)) { mn = 0; mx = 1; }
+      if (mx - mn < 1e-6) { mn -= 1; mx += 1; }
+      const pad = (mx - mn) * 0.08; mn -= pad; mx += pad;
+    }
+    c.strokeStyle = TRACE_COLORS[k]; c.lineWidth = 1.6; c.lineJoin = 'round';
+    c.beginPath();
+    let first = true;
+    for (const i of idxs) {
+      const x = L + pw - ((now - hist.t[i]) / win) * pw;
+      const y = T + ph - clamp((hist.rows[i][ci] - mn) / (mx - mn), 0, 1) * ph;
+      if (first) { c.moveTo(x, y); first = false; } else c.lineTo(x, y);
+    }
+    c.stroke();
+
+    // legenda
+    const last = idxs.length ? hist.rows[idxs[idxs.length - 1]][ci] : null;
+    const meta = ALL[ci];
+    const txt = `${ch}: ${fmt(last, def ? def.dec : meta.dec)} ${unitsOf(ch)}`;
+    const rng = `[${+mn.toFixed(2)} – ${+mx.toFixed(2)}]`;
+    c.textAlign = 'left'; c.textBaseline = 'top';
+    c.font = `600 13px ${SANS}`; c.fillStyle = TRACE_COLORS[k];
+    c.fillText(txt, lx, 8);
+    const tw = c.measureText(txt).width;
+    c.font = `11px ${SANS}`; c.fillStyle = '#6f7682';
+    c.fillText(rng, lx, 25);
+    lx += Math.max(tw, c.measureText(rng).width) + 24;
+  });
+  if (chart.paused) {
+    c.fillStyle = '#ffd60a'; c.font = `700 12px ${SANS}`; c.textAlign = 'right';
+    c.fillText('PAUSADO', w - 12, 8);
+  }
+}
+
+/* ========================= Tabela de canais ========================= */
+const chRows = [];
+function buildChannels() {
+  const body = document.getElementById('chBody');
+  body.innerHTML = '';
+  for (const ch of ALL) {
+    const tr = document.createElement('tr');
+    const off = ch.off == null ? 'calc.' : ch.off;
+    tr.innerHTML = `<td>${ch.name}</td><td class="v">—</td><td class="u"></td><td class="o">${off}</td>`;
+    body.appendChild(tr);
+    chRows.push({ tr, v: tr.children[1], u: tr.children[2], ch });
+  }
+  document.getElementById('chCount').textContent = `${ALL.length} canais`;
+}
+document.getElementById('chFilter').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  for (const r of chRows) r.tr.style.display = !q || r.ch.name.toLowerCase().includes(q) ? '' : 'none';
+});
+function updateChannels(v) {
+  for (const r of chRows) {
+    if (r.tr.style.display === 'none') continue;
+    r.v.textContent = fmt(v[r.ch.name], r.ch.dec);
+    r.u.textContent = unitsOf(r.ch.name);
+  }
+}
+
+/* ========================= Datalog ========================= */
+const rec = { on: false, t0: 0, times: [], rows: [] };
+function setRecording(on) {
+  rec.on = on;
+  if (on && rec.rows.length === 0) rec.t0 = lastT;
+  document.body.classList.toggle('recording', on);
+  document.getElementById('btnRec').classList.toggle('rec', on);
+  document.getElementById('btnRecTxt').textContent = on ? 'Parar' : 'Gravar';
+  document.getElementById('btnRec2').textContent = on ? 'Parar gravação' : 'Iniciar gravação';
+  updateLogInfo();
+}
+function updateLogInfo() {
+  const n = rec.rows.length;
+  const dur = n ? rec.times[n - 1] : 0;
+  const mm = String(Math.floor(dur / 60)).padStart(2, '0'), ss = String(Math.floor(dur % 60)).padStart(2, '0');
+  document.getElementById('logDur').textContent = `${mm}:${ss}`;
+  document.getElementById('logInfo').textContent = n
+    ? `${n} amostras · ${(n / Math.max(dur, 0.001)).toFixed(1)} Hz · ~${(n * ALL.length * 6 / 1048576).toFixed(1)} MB em texto${rec.on ? ' · gravando' : ''}`
+    : (rec.on ? 'Gravando…' : 'Nenhum dado gravado');
+}
+function logChannels() { return ALL.filter(c => c.name !== 'secl'); }
+function download(name, text, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+function stamp() {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}.${p(d.getMinutes())}.${p(d.getSeconds())}`;
+}
+function buildLog(sep, msl) {
+  const chs = logChannels();
+  const lines = [];
+  if (msl) {
+    lines.push(`"${ecuSig || 'Speeduino'} - Speeduino Live (gateway ESP32)"`);
+    lines.push(`"Capture Date: ${new Date().toString()}"`);
+    lines.push(['Time', ...chs.map(c => c.name)].join(sep));
+    lines.push(['s', ...chs.map(c => unitsOf(c.name))].join(sep));
+  } else {
+    lines.push(['Time (s)', ...chs.map(c => { const u = unitsOf(c.name); return u ? `${c.name} (${u})` : c.name; })].join(sep));
+  }
+  for (let r = 0; r < rec.rows.length; r++) {
+    const row = rec.rows[r];
+    const out = [rec.times[r].toFixed(3)];
+    for (const c of chs) out.push(fmt(row[IDX[c.name]], c.dec));
+    lines.push(out.join(sep));
+  }
+  return lines.join('\n') + '\n';
+}
+document.getElementById('btnRec').addEventListener('click', () => setRecording(!rec.on));
+document.getElementById('btnRec2').addEventListener('click', () => setRecording(!rec.on));
+document.getElementById('btnMsl').addEventListener('click', () => {
+  if (rec.rows.length) download(`speeduino_${stamp()}.msl`, buildLog('\t', true), 'text/plain');
+});
+document.getElementById('btnCsv').addEventListener('click', () => {
+  if (rec.rows.length) download(`speeduino_${stamp()}.csv`, buildLog(',', false), 'text/csv');
+});
+document.getElementById('btnClear').addEventListener('click', () => {
+  if (rec.rows.length && !confirm('Apagar o datalog gravado?')) return;
+  rec.rows = []; rec.times = []; rec.t0 = lastT; updateLogInfo();
+});
+
+/* ========================= Conexão ========================= */
+let V = null, lastT = 0, lastFrameAt = 0, newData = false;
+let ws = null, wsOpen = false, gw = null, ecuSig = '';
+let demo = false, demoTimer = null;
+let lastRaw = null;
+
+function onFrame(dv) {
+  if (dv.byteLength < OCH_SIZE) return;
+  lastRaw = new Uint8Array(dv.buffer, dv.byteOffset, OCH_SIZE).slice();
+  V = decode(dv);
+  lastT = performance.now() / 1000;
+  lastFrameAt = performance.now();
+  const row = toRow(V);
+  histPush(lastT, row);
+  if (rec.on) { rec.times.push(lastT - rec.t0); rec.rows.push(row); }
+  newData = true;
+}
+
+function connect() {
+  if (demo || location.protocol === 'file:' || !location.host) return;
+  try { ws = new WebSocket(`ws://${location.host}/ws`); }
+  catch (e) { setTimeout(connect, 2000); return; }
+  ws.binaryType = 'arraybuffer';
+  ws.onopen = () => { wsOpen = true; };
+  ws.onmessage = e => {
+    if (demo) return;
+    if (typeof e.data === 'string') {
+      try { const m = JSON.parse(e.data); if (m.t === 'status') { gw = m; ecuSig = m.sig || ''; } } catch (err) {}
+    } else if (e.data.byteLength >= 1 + OCH_SIZE && new Uint8Array(e.data, 0, 1)[0] === 1) {
+      onFrame(new DataView(e.data, 1, OCH_SIZE));
+    }
+  };
+  ws.onclose = () => { wsOpen = false; gw = null; ws = null; if (!demo) setTimeout(connect, 2000); };
+  ws.onerror = () => { try { ws.close(); } catch (e) {} };
+}
+
+/* ========================= Modo demonstração ========================= */
+function encode(dv, name, value) {
+  const s = SCALAR_BY_NAME[name];
+  const [, type, off, , scale] = s;
+  let raw = Math.round(value / scale);
+  if (type === 'U08') dv.setUint8(off, clamp(raw, 0, 255));
+  else if (type === 'S08') dv.setInt8(off, clamp(raw, -128, 127));
+  else if (type === 'U16') dv.setUint16(off, clamp(raw, 0, 65535), true);
+  else dv.setInt16(off, clamp(raw, -32768, 32767), true);
+}
+function encodeBits(dv, name, value) {
+  const [, off, lo, hi] = BIT_BY_NAME[name];
+  const mask = ((1 << (hi - lo + 1)) - 1) << lo;
+  dv.setUint8(off, (dv.getUint8(off) & ~mask) | ((value << lo) & mask));
+}
+const sim = { t: 0, phase: 'idle', pt: 0, rpm: 850, tps: 0, clt: 22, gear: 1, secl: 0, sacc: 0, ae: 0, prevTps: 0, prevRpm: 850, knock: 0 };
+function simStep(dt) {
+  const s = sim;
+  s.t += dt; s.pt += dt; s.sacc += dt;
+  if (s.sacc >= 1) { s.sacc -= 1; s.secl = (s.secl + 1) % 256; }
+  const ratios = [0, 120, 72, 50, 38, 31];
+  switch (s.phase) {
+    case 'idle':
+      s.tps += (0 - s.tps) * 0.3; s.rpm += (850 + Math.sin(s.t * 3) * 20 - s.rpm) * 0.2; s.gear = 1;
+      if (s.pt > 4) { s.phase = 'accel'; s.pt = 0; }
+      break;
+    case 'accel':
+      s.tps += (85 - s.tps) * 0.25;
+      s.rpm += (1700 / s.gear) * dt * (s.tps / 85) + 200 * dt;
+      if (s.rpm > 6300) {
+        if (s.gear < 4) { s.gear++; s.rpm = 6300 * ratios[s.gear] / ratios[s.gear - 1]; }
+        else { s.phase = 'cruise'; s.pt = 0; }
+      }
+      break;
+    case 'cruise':
+      s.tps += (18 - s.tps) * 0.2; s.rpm += (3000 - s.rpm) * 0.06;
+      if (s.pt > 5) { s.phase = 'decel'; s.pt = 0; }
+      break;
+    case 'decel':
+      s.tps += (0 - s.tps) * 0.4; s.rpm -= 650 * dt;
+      if (s.rpm < 1300) { s.phase = 'idle'; s.pt = 0; }
+      break;
+  }
+  s.clt = Math.min(91, s.clt + dt * 0.9);
+  const tpsDot = (s.tps - s.prevTps) / dt;
+  const rpmDot = (s.rpm - s.prevRpm) / dt;
+  s.prevTps = s.tps; s.prevRpm = s.rpm;
+  if (tpsDot > 40) s.ae = 0.6; else s.ae = Math.max(0, s.ae - dt);
+  const dfco = s.phase === 'decel' && s.tps < 1 && s.rpm > 1500;
+  const baro = 100;
+  let map = 30 + s.tps * 0.75;
+  if (s.tps > 70 && s.rpm > 3500) map += Math.min(70, (s.rpm - 3500) * 0.03);
+  if (dfco) map = 22;
+  map += (Math.random() - 0.5) * 1.5;
+  const afrTarget = map < 70 ? 14.7 : 14.7 - Math.min(2.6, (map - 70) * 0.05);
+  const afr = dfco ? 20.5 : afrTarget + (Math.random() - 0.5) * 0.4 + (s.ae > 0 ? -0.9 : 0);
+  const ve = clamp(42 + s.tps * 0.35 + s.rpm / 220, 0, 120);
+  const warm = s.clt < 70 ? Math.round(100 + (70 - s.clt) * 1.1) : 100;
+  const ae = s.ae > 0 ? 150 : 100;
+  const ego = Math.round(100 + Math.sin(s.t * 1.7) * 3);
+  const gamma = Math.round(warm * (ae / 100) * (ego / 100));
+  const pw = dfco ? 0 : 6 * (ve / 100) * (map / 100) * (gamma / 100) + 0.95;
+  const adv = s.phase === 'idle' ? 14 + Math.sin(s.t * 2) : clamp(36 - Math.max(0, map - 90) * 0.25 - s.tps * 0.06, 8, 40);
+  s.knock = (s.tps > 80 && Math.random() < 0.02) ? 1 : 0;
+
+  const buf = new ArrayBuffer(OCH_SIZE), dv = new DataView(buf);
+  const set = (n, x) => encode(dv, n, x);
+  set('secl', s.secl); set('map', map); set('iatRaw', 34 + 40); set('coolantRaw', s.clt + 40);
+  set('batCorrection', 100); set('batteryVoltage', 13.9 + (Math.random() - 0.5) * 0.2);
+  set('afr', afr); set('afr2', afr + 0.1); set('egoCorrection', ego); set('airCorrection', 98);
+  set('warmupEnrich', warm); set('rpm', s.rpm); set('accelEnrich', ae); set('gammaEnrich', gamma);
+  set('VE1', ve); set('VE2', ve); set('veCurr', ve); set('afrTarget', afrTarget);
+  set('TPSdot', tpsDot); set('advance', adv); set('advance1', adv); set('advance2', adv); set('tps', s.tps);
+  set('loopsPerSecond', 2150 + Math.round(Math.random() * 40)); set('freeRAM', 1834);
+  set('boostTarget', 150); set('boostDuty', map > 100 ? 45 : 0); set('rpmDOT', rpmDot);
+  set('idleLoad', s.phase === 'idle' ? 32 : 18); set('baro', baro); set('tpsADC', 20 + s.tps * 1.9);
+  set('pulseWidth', pw); set('pulseWidth2', pw); set('pulseWidth3', 0); set('pulseWidth4', 0);
+  set('fuelLoad', map); set('ignLoad', map); set('dwell', 3.2); set('dwellActual', 3.18 + Math.random() * 0.04);
+  set('CLIdleTarget', 850); set('MAPdot', 0); set('baroCorrection', 100); set('ASECurr', s.t < 15 ? 125 : 100);
+  set('vss', s.rpm / ratios[s.gear] * (s.phase === 'idle' ? 0 : 1)); set('gear', s.phase === 'idle' ? 0 : s.gear);
+  set('fuelPressure', 43); set('oilPressure', 20 + s.rpm / 120); set('fuelTempRaw', 30 + 40);
+  set('fuelTempCor', 100); set('emap', map * 1.3); set('fanDuty', s.clt > 89 ? 60 : 0);
+  set('flex', 27); set('flexFuelCor', 100); set('knockCor', s.knock ? 2 : 0);
+  set('vvt1Angle', 10 + s.rpm / 250); set('vvt1Target', 10 + s.rpm / 250); set('vvt1Duty', 45);
+  const bit = (n, x) => encodeBits(dv, n, x ? 1 : 0);
+  bit('running', s.rpm > 0); bit('warmup', s.clt < 70); bit('ase', s.t < 15);
+  bit('tpsaccaen', s.ae > 0); bit('DFCOOn', dfco); bit('sync', true); bit('idleControlOn', s.phase === 'idle');
+  bit('fanStatus', s.clt > 89); bit('knockActive', s.knock); bit('engineProtectRPM', false);
+  encodeBits(dv, 'nSquirts', 1); bit('inj1Status', true); bit('inj2Status', true);
+  dv.setUint8(120, 0b0101);
+  return dv;
+}
+function startDemo() {
+  if (demo) return;
+  demo = true;
+  if (ws) { try { ws.close(); } catch (e) {} }
+  ecuSig = 'speeduino 202501 (demo)';
+  demoTimer = setInterval(() => onFrame(simStep(0.04)), 40);
+  document.getElementById('btnDemo').textContent = 'Sair do demo';
+}
+function stopDemo() {
+  demo = false;
+  clearInterval(demoTimer);
+  ecuSig = '';
+  document.getElementById('btnDemo').textContent = 'Demo';
+  connect();
+}
+document.getElementById('btnDemo').addEventListener('click', () => demo ? stopDemo() : startDemo());
+
+/* ========================= Cabeçalho e status ========================= */
+function updateHeader() {
+  const fresh = performance.now() - lastFrameAt < 1500;
+  document.body.classList.toggle('stale', !fresh);
+  const pill = document.getElementById('conn');
+  if (demo) { pill.className = 'pill demo'; pill.textContent = 'DEMO'; }
+  else if (!wsOpen) { pill.className = 'pill off'; pill.textContent = 'Gateway desconectado'; }
+  else if (!fresh) { pill.className = 'pill warn'; pill.textContent = 'ECU sem resposta'; }
+  else { pill.className = 'pill ok'; pill.textContent = 'ECU online'; }
+  document.getElementById('hSig').textContent = ecuSig || '—';
+  document.getElementById('hHz').textContent = demo ? '25.0' : gw ? gw.hz.toFixed(1) : '0';
+  document.getElementById('hSecl').textContent = V ? V.secl : 0;
+
+  const kv = demo ? [['Modo', 'demonstração (dados simulados)']] : gw ? [
+    ['ECU', gw.ecu ? 'online' : 'sem resposta'],
+    ['Assinatura', gw.sig || '—'],
+    ['Taxa de quadros', gw.hz.toFixed(1) + ' Hz'],
+    ['Quadros recebidos', gw.frames],
+    ['Timeouts', gw.timeouts],
+    ['Clientes conectados', gw.clients],
+    ['Tempo ligado', fmtUptime(gw.uptime)],
+    ['IP do ponto de acesso', gw.apIp],
+    ['IP na rede local', gw.staIp || '—'],
+    ['Sinal WiFi (STA)', gw.rssi ? gw.rssi + ' dBm' : '—'],
+    ['Memória livre', (gw.heap / 1024).toFixed(0) + ' KB'],
+  ] : [['Gateway', 'desconectado']];
+  document.getElementById('gwStatus').innerHTML = kv.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+  if (lastRaw) {
+    let s = '';
+    for (let i = 0; i < lastRaw.length; i++) s += lastRaw[i].toString(16).padStart(2, '0') + (i % 16 === 15 ? '\n' : ' ');
+    document.getElementById('rawHex').textContent = s;
+  }
+}
+function fmtUptime(s) {
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
+  return `${h}h ${String(m).padStart(2, '0')}m ${String(ss).padStart(2, '0')}s`;
+}
+
+/* ========================= Abas, configurações, tela cheia ========================= */
+let activeTab = 'dash';
+function showTab(name) {
+  if (!document.getElementById('tab-' + name)) return;
+  activeTab = name;
+  document.querySelectorAll('nav.tabs button').forEach(x => x.classList.toggle('active', x.dataset.tab === name));
+  document.querySelectorAll('main section').forEach(s => s.classList.toggle('active', s.id === 'tab-' + name));
+  if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+  requestAnimationFrame(() => { resizeAll(); resizeChart(); });
+}
+document.querySelectorAll('nav.tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+const SETTING_FIELDS = [
+  ['sTemp', 'tempUnit', 'str'], ['sStoich', 'stoich', 'num'], ['sTwoStroke', 'twoStroke', 'bool'],
+  ['sRpmMax', 'rpmMax', 'num'], ['sRpmWarn', 'rpmWarn', 'num'], ['sRpmDang', 'rpmDang', 'num'],
+  ['sMapMax', 'mapMax', 'num'], ['sMapWarn', 'mapWarn', 'num'], ['sMapDang', 'mapDang', 'num'],
+  ['sBatLow', 'batLow', 'num'], ['sBatHigh', 'batHigh', 'num'], ['sTpsFlood', 'tpsFlood', 'num'],
+  ['sCrankRpm', 'crankRpm', 'num'],
+];
+document.getElementById('btnSettings').addEventListener('click', () => {
+  for (const [id, key, t] of SETTING_FIELDS) {
+    const el = document.getElementById(id);
+    if (t === 'bool') el.checked = !!S[key]; else el.value = S[key];
+  }
+  document.getElementById('dlgSettings').showModal();
+});
+document.getElementById('dlgSettings').addEventListener('close', e => {
+  const rv = e.target.returnValue;
+  if (rv === 'reset') {
+    if (!confirm('Restaurar os mostradores para o layout padrão?')) return;
+    LAYOUT = structuredClone(DEFAULT_LAYOUT); save('sdl.layout', LAYOUT); buildDash(); return;
+  }
+  if (rv !== 'ok') return;
+  for (const [id, key, t] of SETTING_FIELDS) {
+    const el = document.getElementById(id);
+    if (t === 'bool') S[key] = el.checked;
+    else if (t === 'num') { const n = parseFloat(el.value); if (isFinite(n)) S[key] = n; }
+    else S[key] = el.value;
+  }
+  save('sdl.settings', S);
+  buildGauges(); applyLayoutDefs();
+});
+document.getElementById('btnFull').addEventListener('click', () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen?.().catch(() => {});
+});
+
+/* ========================= Laço de desenho ========================= */
+function frameLoop() {
+  const v = V || {};
+  if (activeTab === 'dash') {
+    gauges.main.forEach(g => g.update(V ? v[g.def.ch] : null));
+    gauges.sec.forEach(g => g.update(V ? v[g.def.ch] : null));
+    if (newData && V) updateIndicators(V);
+  } else if (activeTab === 'chart') {
+    if (newData || chart.paused === false) drawChart();
+  }
+  newData = false;
+  requestAnimationFrame(frameLoop);
+}
+// Atualizações lentas (texto e tabelas) a 5 Hz, fora do laço de desenho
+setInterval(() => {
+  updateHeader();
+  if (activeTab === 'channels' && V) updateChannels(V);
+  if (activeTab === 'log') updateLogInfo();
+}, 200);
+
+/* ========================= Início ========================= */
+if (!S.chart || !Array.isArray(S.chart.chs)) S.chart = structuredClone(DEFAULT_SETTINGS.chart);
+if (!Array.isArray(LAYOUT.main) || !Array.isArray(LAYOUT.sec)) LAYOUT = structuredClone(DEFAULT_LAYOUT);
+buildGauges();
+buildDash();
+buildIndicators();
+buildChartBar();
+buildChannels();
+updateLogInfo();
+// Aberto direto do disco (file://) não há gateway: entra em demonstração.
+if (new URLSearchParams(location.search).has('demo') || location.protocol === 'file:') startDemo(); else connect();
+if (location.hash) showTab(location.hash.slice(1));
+requestAnimationFrame(frameLoop);
+</script>
+</body>
+</html>
