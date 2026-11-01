@@ -225,6 +225,10 @@ static uint8_t execute(const Packet& p) {
       return ST_OK;
     }
 
+    case CMD_SLEEP:
+      saveCounter();  // sem isto, o reboot volta a um contador antigo e reabre o replay
+      return ST_OK;
+
     default:
       return ST_UNSUPPORTED;
   }

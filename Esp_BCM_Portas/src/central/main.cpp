@@ -5,6 +5,9 @@
 // ============================================================================
 #include <Arduino.h>
 #include <Preferences.h>
+#include <driver/gpio.h>
+#include <driver/uart.h>
+#include <esp_sleep.h>
 #if __has_include(<esp_random.h>)
 #include <esp_random.h>
 #else
@@ -25,6 +28,7 @@ struct DoorSlot {
   uint8_t mac[6] = {};
   uint32_t lastSeen = 0;
   bool online = false;
+  bool waiting = false;  // religada: comandos ficam guardados ate a porta responder
   uint8_t state = 0;
 };
 
@@ -41,6 +45,11 @@ struct Pending {
   uint16_t reqId;
   uint8_t tries;
   uint32_t sentAt;
+};
+
+struct Deferred {  // comando aguardando a porta terminar o boot
+  bool used;
+  uint8_t door, cmd, arg;
 };
 
 struct VirtualHold {  // "aperto de botao" simulado pelo terminal serial
@@ -61,6 +70,10 @@ static constexpr uint32_t kCounterBlock = 1000;
 static uint32_t txCounter = 0, counterReserved = 0;
 static uint16_t reqSeq = 0;
 static Pending pend[16];
+static Deferred deferred[12];
+
+static bool radioUp = false, stopping = false;
+static uint32_t powerOnAt = 0, lastActivity = 0, lastBootPing = 0;
 
 static bool pairing = false;
 static uint32_t pairingUntil = 0, lastBeacon = 0, lastPing = 0;
@@ -100,11 +113,12 @@ static Button btnMirUp(frontPin(PIN_MIR_UP), false), btnMirDown(frontPin(PIN_MIR
 static Button btnMirLeft(frontPin(PIN_MIR_LEFT), false);
 static Button btnMirRight(frontPin(PIN_MIR_RIGHT), false);
 static Button btnFold(frontPin(PIN_FOLD));
+static Button btnIgnition(PIN_IGNITION);
 
 static Button* const allButtons[] = {
     &btnPair, &btnWin[0], &btnWin[1], &btnWin[2], &btnWin[3], &btnWin[4], &btnWin[5],
     &btnWin[6], &btnWin[7], &btnLock, &btnUnlock, &btnTurnL, &btnTurnR, &btnHazard,
-    &btnMirSel, &btnMirUp, &btnMirDown, &btnMirLeft, &btnMirRight, &btnFold,
+    &btnMirSel, &btnMirUp, &btnMirDown, &btnMirLeft, &btnMirRight, &btnFold, &btnIgnition,
 };
 
 // ---------------------------------------------------------------------------
@@ -187,8 +201,24 @@ static void transmit(uint8_t door, uint8_t cmd, uint8_t arg, uint8_t flags, uint
   radio.send(doors[door].mac, p, netKey);
 }
 
+// O comando mais novo do mesmo tipo substitui o guardado (ex.: soltar o botao do vidro
+// antes da porta terminar o boot troca SUBIR por PARAR).
+static void deferCommand(uint8_t door, uint8_t cmd, uint8_t arg) {
+  Deferred* slot = nullptr;
+  for (auto& e : deferred) {
+    if (e.used && e.door == door && e.cmd == cmd) { e.arg = arg; return; }
+    if (!e.used && !slot) slot = &e;
+  }
+  if (slot) *slot = {true, door, cmd, arg};
+  else Serial.println("! fila de comandos adiados cheia");
+}
+
 static void sendCommand(uint8_t door, uint8_t cmd, uint8_t arg, SendMode mode) {
   if (door >= ROLE_COUNT || !doors[door].paired) return;
+  if (doors[door].waiting && cmd != CMD_PING) {
+    if (mode == RELIABLE) deferCommand(door, cmd, arg);
+    return;  // refresh/pisca perdidos aqui sao repostos pelo proximo ciclo
+  }
 
   // Um comando mais novo do mesmo tipo cancela as retransmissoes do anterior
   // (evita, por exemplo, um "SUBIR" atrasado chegar depois do "PARAR").
@@ -206,6 +236,16 @@ static void sendCommand(uint8_t door, uint8_t cmd, uint8_t arg, SendMode mode) {
     }
   }
   Serial.println("! fila de comandos pendentes cheia");
+}
+
+static void doorReady(uint8_t d) {
+  doors[d].waiting = false;
+  for (auto& e : deferred) {
+    if (e.used && e.door == d) {
+      e.used = false;
+      sendCommand(d, e.cmd, e.arg, RELIABLE);
+    }
+  }
 }
 
 static void processRetries() {
@@ -301,6 +341,7 @@ static void handleFrame(const RxFrame& f) {
   if (d < 0 || p.netId != netId || !Link::verify(p, netKey)) return;
   doors[d].lastSeen = millis();
   doors[d].state = p.state;
+  if (doors[d].waiting) doorReady(d);
 
   if (p.type == MSG_ACK) onAck(d, p);
   else if (p.type == MSG_RESULT)
@@ -377,9 +418,19 @@ static void updatePresence() {
     lastPing = now;
     for (uint8_t d = 0; d < ROLE_COUNT; d++) sendCommand(d, CMD_PING, 0, ACK_ONLY);
   }
+  bool bootPing = now - lastBootPing >= DOOR_BOOT_PING_MS;
+  if (bootPing) lastBootPing = now;
   for (uint8_t d = 0; d < ROLE_COUNT; d++) {
     DoorSlot& s = doors[d];
     if (!s.paired) continue;
+    if (s.waiting) {
+      if (now - powerOnAt >= DOOR_BOOT_TIMEOUT_MS) {
+        Serial.printf("[%s] nao respondeu apos religar\n", roleName(d));
+        doorReady(d);  // comandos guardados seguem e terminam em SEM RESPOSTA
+      } else if (bootPing) {
+        sendCommand(d, CMD_PING, 0, ACK_ONLY);
+      }
+    }
     bool on = s.lastSeen != 0 && now - s.lastSeen < OFFLINE_AFTER_MS;
     if (on == s.online) continue;
     s.online = on;
@@ -509,6 +560,87 @@ static void updateLed() {
 }
 
 // ---------------------------------------------------------------------------
+// Economia de energia: corta o 12 V das portas e dorme ate alguma entrada acordar
+// ---------------------------------------------------------------------------
+static void powerDoors() {
+  digitalWrite(PIN_DOOR_POWER, HIGH);
+  powerOnAt = lastActivity = millis();
+  for (auto& d : doors) d.waiting = d.paired;
+}
+
+static void startRadio() {
+  if (!radio.begin()) {
+    Serial.println("Falha ao iniciar ESP-NOW");
+    ESP.restart();
+  }
+  radio.addPeer(kBroadcast);
+  for (auto& d : doors)
+    if (d.paired) radio.addPeer(d.mac);
+  radioUp = true;
+}
+
+// O seletor do espelho e uma chave de posicao: fechada, nao indica atividade.
+static bool isActivityInput(const Button* b) { return b != &btnMirSel && b->pin() >= 0; }
+
+static bool keepAwake() {
+  if (pairing || hazard || turnMode != TURN_OFF || virt(cliMir) != MOVE_STOP) return true;
+  for (Button* b : allButtons)
+    if (isActivityInput(b) && b->isPressed()) return true;
+  for (uint8_t d = 0; d < ROLE_COUNT; d++) {
+    if (virt(cliWin[d]) != MOVE_STOP) return true;
+    if (doors[d].online && (doors[d].state & (STATE_WINDOW_MOVING | STATE_MIRROR_MOVING)))
+      return true;
+  }
+  return false;
+}
+
+static void sleepUntilInput() {
+  Serial.println(">> Inativo: portas desligadas, central dormindo");
+  digitalWrite(PIN_DOOR_POWER, LOW);
+  digitalWrite(PIN_LED, LOW);
+  for (auto& d : doors) {
+    d.online = false;
+    d.lastSeen = 0;
+  }
+  Serial.flush();
+  radio.end();
+  radioUp = false;
+
+  for (Button* b : allButtons)
+    if (isActivityInput(b)) gpio_wakeup_enable((gpio_num_t)b->pin(), GPIO_INTR_LOW_LEVEL);
+  esp_sleep_enable_gpio_wakeup();
+  uart_set_wakeup_threshold(UART_NUM_0, 3);  // terminal: os primeiros caracteres se perdem
+  esp_sleep_enable_uart_wakeup(UART_NUM_0);
+
+  esp_light_sleep_start();
+
+  for (Button* b : allButtons)
+    if (isActivityInput(b)) gpio_wakeup_disable((gpio_num_t)b->pin());
+  stopping = false;
+  powerDoors();
+  Serial.println(">> Acordou: religando portas");
+}
+
+static void servicePower() {
+  uint32_t now = millis();
+  if (keepAwake()) {
+    lastActivity = now;
+    stopping = false;
+    return;
+  }
+  if (!stopping) {
+    if (now - lastActivity < DOOR_OFF_IDLE_MS) return;
+    stopping = true;
+    for (uint8_t d = 0; d < ROLE_COUNT; d++) sendCommand(d, CMD_SLEEP, 0, RELIABLE);
+    return;
+  }
+  // Corta so depois do ACK (ou de esgotar as tentativas) de todas as portas.
+  for (auto& e : pend)
+    if (e.used && e.cmd == CMD_SLEEP) return;
+  sleepUntilInput();
+}
+
+// ---------------------------------------------------------------------------
 // Terminal serial (para testar sem montar todos os botoes)
 // ---------------------------------------------------------------------------
 static void printHelp() {
@@ -519,7 +651,8 @@ static void printHelp() {
       "  vidro <de|dd|te|td> <sobe|desce|para> [ms=2000]\n"
       "  seta <e|d|off>  |  alerta\n"
       "  espelho <e|d> <cima|baixo|esq|dir> [ms=500]\n"
-      "  rebater | abrir");
+      "  rebater | abrir\n"
+      "  dormir  (corta as portas agora; Enter no terminal acorda)");
 }
 
 static int parseDoor(const char* s) {
@@ -550,6 +683,7 @@ static void runCommand(char* line) {
   else if (cmd == "destravar") setLock(false);
   else if (cmd == "rebater") setFold(true);
   else if (cmd == "abrir") setFold(false);
+  else if (cmd == "dormir") lastActivity = millis() - DOOR_OFF_IDLE_MS;
   else if (cmd == "alerta") { hazard = !hazard; Serial.printf(">> Pisca-alerta %s\n", hazard ? "LIGADO" : "DESLIGADO"); }
   else if (cmd == "seta" && a1) {
     String s = a1;
@@ -574,8 +708,13 @@ static void handleSerial() {
   while (Serial.available()) {
     char c = Serial.read();
     if (c == '\r') continue;
-    if (c == '\n') { buf[n] = 0; runCommand(buf); n = 0; }
-    else if (n < sizeof(buf) - 1) buf[n++] = c;
+    if (c == '\n') {
+      lastActivity = millis();
+      stopping = false;
+      buf[n] = 0;
+      runCommand(buf);
+      n = 0;
+    } else if (n < sizeof(buf) - 1) buf[n++] = c;
   }
 }
 
@@ -584,6 +723,7 @@ void setup() {
   Serial.begin(115200);
   pinMode(PIN_LED, OUTPUT);
   pinMode(PIN_TURN_INDICATOR, OUTPUT);
+  pinMode(PIN_DOOR_POWER, OUTPUT);
   for (Button* b : allButtons) b->begin();
 
   if (!radio.begin()) {
@@ -595,6 +735,8 @@ void setup() {
   radio.addPeer(kBroadcast);
   for (auto& d : doors)
     if (d.paired) radio.addPeer(d.mac);
+  radioUp = true;
+  powerDoors();
 
   Serial.println("\n=== Esp_BCM CENTRAL ===");
   printStatus();
@@ -602,6 +744,8 @@ void setup() {
 }
 
 void loop() {
+  if (!radioUp && millis() - powerOnAt >= RADIO_WAKE_DELAY_MS) startRadio();
+
   RxFrame f;
   while (radio.receive(f)) handleFrame(f);
   for (Button* b : allButtons) b->update();
@@ -615,5 +759,6 @@ void loop() {
   processRetries();
   updateLed();
   handleSerial();
+  servicePower();
   delay(1);
 }

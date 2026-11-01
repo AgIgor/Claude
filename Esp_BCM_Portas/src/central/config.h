@@ -46,6 +46,18 @@ constexpr int8_t PIN_MIR_LEFT  = 36;  // VP
 constexpr int8_t PIN_MIR_RIGHT = 39;  // VN
 constexpr int8_t PIN_FOLD      = 4;   // pulso: alterna rebatido/aberto
 
+// --- Alimentacao das portas / economia de energia ---
+// Saida: HIGH fecha o rele do 12 V das portas (via MOSFET). GPIO 12 precisa estar em
+// nivel baixo no boot: mantenha um pull-down de 10k no gate, que tambem abre o rele em reset.
+constexpr int8_t PIN_DOOR_POWER = 12;
+// Ignicao ligada = pino em GND (optoacoplador ou transistor). -1 = sem sinal de ignicao.
+constexpr int8_t PIN_IGNITION   = 15;
+
+constexpr uint32_t DOOR_OFF_IDLE_MS     = 5 * 60000UL;  // inatividade ate cortar as portas
+constexpr uint32_t DOOR_BOOT_TIMEOUT_MS = 2000;  // espera maxima pela porta apos religar
+constexpr uint32_t DOOR_BOOT_PING_MS    = 50;    // intervalo do ping durante essa espera
+constexpr uint32_t RADIO_WAKE_DELAY_MS  = 50;    // ler o botao que acordou antes de ligar o radio
+
 // --- Comportamento ---
 constexpr bool     AUTO_FOLD_ON_LOCK = true;   // rebate espelhos ao travar, abre ao destravar
 constexpr uint32_t BLINK_HALF_MS     = 350;    // ~85 piscadas/min

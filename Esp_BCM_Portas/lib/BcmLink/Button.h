@@ -28,6 +28,7 @@ class Button {
     }
   }
 
+  int8_t pin() const { return pin_; }
   bool isPressed() const { return stable_; }
   bool pressed() const { return pressedEdge_; }
   bool released() const { return releasedEdge_; }

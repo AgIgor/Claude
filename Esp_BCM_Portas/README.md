@@ -99,16 +99,23 @@ pisca rápido = pareando · piscada curta a cada 2 s = nada pareado.
 | Vidro TD sobe/desce | 21 / 22 | | Saída indicador do painel | 5 |
 | Seletor espelho (aberto=E, GND=D) | 33 | | Rebater/abrir (pulso) | 4 |
 | Espelho cima/baixo | 34 / 35 ⚠ | | Espelho esq./dir. | 36 / 39 ⚠ |
+| Relé do 12 V das portas (saída) | 12 ⚠ | | Ignição (ligada = GND) | 15 |
 
 ⚠ GPIO 34, 35, 36 e 39 são somente entrada e **não têm pull-up interno**: coloque um
 resistor de 10 kΩ de cada um até o 3V3.
+
+⚠ GPIO 12 precisa estar em nível baixo no boot: acione o relé por MOSFET, com diodo de roda
+livre na bobina e pull-down de 10 kΩ no gate. Assim o relé também abre se a central resetar.
+
+Ignição: isole o 12 V com optoacoplador ou transistor; ignição ligada coloca o GPIO 15 em GND.
+Sem esse sinal, use `PIN_IGNITION = -1`, mas aí o desligamento depende só da inatividade.
 
 ## Ligações da porta
 
 | Função | GPIO | Driver sugerido |
 |---|---|---|
 | Vidro (A=sobe, B=desce) | 25 / 26 | BTS7960 (motor de vidro puxa 5–15 A, pico > 20 A) |
-| Trava (A=trava, B=destrava) | 27 / 14 | BTS7960, DRV8871 ou 2 relés |
+| Trava (A=trava, B=destrava) | 27 / 13 | BTS7960, DRV8871 ou 2 relés |
 | Espelho vertical (A=cima, B=baixo) | 16 / 17 | DRV8871 / L298N |
 | Espelho horizontal (A=dir., B=esq.) | 18 / 19 | DRV8871 / L298N |
 | Rebatimento (A=rebate, B=abre) | 21 / 22 | DRV8871 / BTS7960 |
@@ -148,6 +155,24 @@ cada motor usa uma ponte H própria; para usar o comum, troque `mirV/mirH` por m
 `OK` = recebeu e executou (ou começou a executar). Ações com duração (trava, rebatimento) e
 paradas automáticas do vidro também mandam um `RESULT` quando terminam.
 
+## Economia de energia (carro parado)
+
+A central fica ligada direto no 12 V e controla o 12 V das portas por um relé.
+
+- **Desligar:** após `DOOR_OFF_IDLE_MS` (5 min) sem atividade, a central envia `CMD_SLEEP`.
+  Cada porta grava o contador anti-replay e responde. Depois disso, ou ao esgotar as
+  tentativas, a central abre o relé, desliga o rádio e entra em light sleep.
+- **Fica acordada com:** ignição ligada, pisca-alerta, seta, pareamento, qualquer botão
+  pressionado ou vidro/espelho em movimento.
+- **Acordar:** qualquer botão, a ignição ou o terminal serial. A central fecha o relé, envia
+  ping a cada 50 ms e guarda os comandos até cada porta responder (até 2 s). O comando que
+  acordou o carro não se perde, mas o primeiro comando sofre o atraso do boot das portas.
+- O seletor do espelho não acorda a central, porque fica fechado na posição "direito".
+
+Use um relé automotivo dimensionado pela soma medida dos motores e um fusível por porta.
+Mantenha pull-down nas entradas das pontes H: elas flutuam durante o boot da porta.
+O terminal aceita `dormir` para testar sem esperar os 5 min.
+
 ## Testar sem montar os botões
 
 No monitor serial da central (115200, fim de linha LF):
@@ -159,6 +184,7 @@ vidro dd sobe 3000         vidro te desce          vidro de para
 seta e   seta d   seta off alerta
 espelho e cima 500         espelho d esq
 rebater                    abrir
+dormir
 ```
 
 ## Protocolo e segurança

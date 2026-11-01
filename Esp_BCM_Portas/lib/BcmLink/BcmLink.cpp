@@ -48,6 +48,11 @@ bool Link::begin(uint8_t channel) {
   return true;
 }
 
+void Link::end() {
+  esp_now_deinit();
+  WiFi.mode(WIFI_OFF);
+}
+
 bool Link::addPeer(const uint8_t mac[6]) {
   if (esp_now_is_peer_exist(mac)) return true;
   esp_now_peer_info_t peer = {};

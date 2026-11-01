@@ -13,6 +13,7 @@ struct RxFrame {
 class Link {
  public:
   bool begin(uint8_t channel = kChannel);
+  void end();  // desliga o Wi-Fi; os peers sao perdidos e precisam ser adicionados de novo
   bool addPeer(const uint8_t mac[6]);
   void removePeer(const uint8_t mac[6]);
 

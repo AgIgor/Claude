@@ -51,6 +51,7 @@ enum Cmd : uint8_t {
   CMD_LAMP   = 3,  // arg: 0/1 seta (pisca) - so dianteiras
   CMD_MIRROR = 4,  // arg: MOVE_*  (segurar-para-mover) - so dianteiras
   CMD_FOLD   = 5,  // arg: FOLD_*  - so dianteiras
+  CMD_SLEEP  = 6,  // central vai cortar a alimentacao: porta grava o contador e responde
 };
 
 enum Move : uint8_t { MOVE_STOP = 0, MOVE_UP = 1, MOVE_DOWN = 2, MOVE_LEFT = 3, MOVE_RIGHT = 4 };
@@ -88,6 +89,7 @@ inline const char* cmdName(uint8_t c) {
     case CMD_LAMP: return "SETA";
     case CMD_MIRROR: return "ESPELHO";
     case CMD_FOLD: return "REBATIMENTO";
+    case CMD_SLEEP: return "DESLIGAR";
     default: return "?";
   }
 }

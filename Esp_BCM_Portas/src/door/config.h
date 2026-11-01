@@ -17,7 +17,8 @@ constexpr int8_t PIN_CODE1 = 33;
 
 // --- Pontes H: {A, B}. A=HIGH -> sentido "+", B=HIGH -> sentido "-" ---
 constexpr int8_t PIN_WINDOW[2] = {25, 26};  // + sobe   / - desce
-constexpr int8_t PIN_LOCK[2]   = {27, 14};  // + trava  / - destrava
+// Evite o GPIO 14 aqui: ele pode pulsar no boot, e a porta reinicia a cada religamento.
+constexpr int8_t PIN_LOCK[2]   = {27, 13};  // + trava  / - destrava
 // Somente portas dianteiras:
 constexpr int8_t PIN_MIR_V[2]  = {16, 17};  // + cima   / - baixo
 constexpr int8_t PIN_MIR_H[2]  = {18, 19};  // + direita/ - esquerda
