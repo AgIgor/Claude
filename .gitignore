@@ -15,3 +15,14 @@ __pycache__/
 # Android / Gradle
 .gradle/
 local.properties
+
+# Binario gerado pelo build.bat
+Monitor Serial/MonitorSerial.exe
+
+# Fora do repositorio publico: contem MAC, numero de serie ou IP interno do modulo
+Analisador de sinais/20261031_173535.jpg
+Analisador de sinais/Resultado/captura_2026-10-31-21-56-09.csv
+Analisador de sinais/Resultado/captura_2026-10-31-22-19-31.csv
+Analisador de sinais/Resultado/captura_2026-10-31-22-46-08.csv
+Analisador de sinais/Resultado/captura_2026-10-31-23-29-06.csv
+Analisador de sinais/Resultado/captura_2026-11-01-15-04-58.csv
